@@ -3,10 +3,14 @@ import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Peer } from 'peerjs'
 import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, XCircle, Trash2, CheckCircle, UserCheck, ChevronRight, Loader2, Hospital, AlertCircle, Clock } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
 export default function Consult() {
     const [session, setSession] = useState(null)
     const [profile, setProfile] = useState(null)
+    const { language } = useLanguage()
+    const t = translations[language]
 
     // Logic
     const [doctorsOnlineCount, setDoctorsOnlineCount] = useState(0)
@@ -74,8 +78,8 @@ export default function Consult() {
                     call.on('close', () => endCall())
                 } catch (err) {
                     console.error('Media Error', err)
-                    let msg = 'Could not access Camera/Mic.'
-                    if (err.name === 'NotAllowedError') msg = 'Permission denied. Please allow access in browser settings.'
+                    let msg = language === 'en' ? 'Could not access Camera/Mic.' : 'ไม่สามารถเข้าถึงกล้องหรือไมโครโฟนได้'
+                    if (err.name === 'NotAllowedError') msg = language === 'en' ? 'Permission denied. Please allow access in browser settings.' : 'การเข้าถึงถูกปฏิเสธ กรุณาอนุญาตการเข้าถึงในตั้งค่าเบราว์เซอร์'
                     alert(`${msg}\n(${err.name})`)
                     setCallStatus('idle')
                 }
@@ -323,9 +327,9 @@ export default function Consult() {
 
             if (error) {
                 console.error(error)
-                alert('Error clearing queue: ' + error.message)
+                alert(language === 'en' ? 'Error clearing queue: ' + error.message : 'เกิดข้อผิดพลาดในการล้างคิว: ' + error.message)
             } else {
-                alert(`Successfully deleted ${count ?? 'all'} waiting patients.`)
+                alert(language === 'en' ? `Successfully deleted ${count ?? 'all'} waiting patients.` : `ลบคิวผู้ป่วย ${count ?? 'ทั้งหมด'} เรียบร้อยแล้ว`)
                 fetchIncomingPatients()
             }
         } catch (err) {
@@ -433,7 +437,7 @@ export default function Consult() {
         }
 
         await supabase.from('consultations').update({ summary: summaryText }).eq('id', activeConsultation.id)
-        alert('Prescription/Notes Saved!')
+        alert(language === 'en' ? 'Prescription/Notes Saved!' : 'บันทึกรายการยาและบันทึกเรียบร้อยแล้ว!')
     }
 
     const confirmPayment = async () => {
@@ -500,8 +504,8 @@ export default function Consult() {
                                 <div style={{ width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Video size={64} style={{ opacity: 0.2 }} />
                                 </div>
-                                <h3 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Audio Only</h3>
-                                <p className="text-muted">User camera is off or unavailable</p>
+                                <h3 style={{ fontSize: '1.5rem', fontWeight: '700' }}>{language === 'en' ? 'Audio Only' : 'ปิดกล้อง'}</h3>
+                                <p className="text-muted">{language === 'en' ? 'User camera is off or unavailable' : 'กล้องของผู้ใช้งานปิดอยู่หรือไม่พร้อมใช้งาน'}</p>
                             </div>
                         )}
 
@@ -531,7 +535,7 @@ export default function Consult() {
                             )}
                             {!isVideoEnabled && !isLocalAudioOnly && (
                                 <div style={{ position: 'absolute', inset: 0, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                                    Video Paused
+                                    {language === 'en' ? 'Video Paused' : 'หยุดวิดีโอ'}
                                 </div>
                             )}
                         </div>
@@ -555,8 +559,8 @@ export default function Consult() {
                 {isDoctor && (
                     <div className="animate-fade-in" style={{ width: '400px', background: 'white', padding: '2rem', display: 'flex', flexDirection: 'column', overflowY: 'auto', borderLeft: '1px solid var(--border-color)' }}>
                         <div style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>Consultation Notes</h3>
-                            <p className="text-muted" style={{ fontSize: '0.875rem' }}>These notes will be shared with the patient.</p>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>{t.consult.writeSummary}</h3>
+                            <p className="text-muted" style={{ fontSize: '0.875rem' }}>{language === 'en' ? 'These notes will be shared with the patient.' : 'บันทึกนี้จะถูกส่งไปให้ผู้ป่วยดู'}</p>
                         </div>
 
                         <textarea
@@ -578,12 +582,12 @@ export default function Consult() {
                                         <input className="input" type="number" placeholder="Price (฿)" value={m.price} onChange={e => updateMed(i, 'price', e.target.value)} />
                                     </div>
                                     <button onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))} style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', background: 'none', padding: '0.5rem 0', cursor: 'pointer' }}>
-                                        <Trash2 size={12} style={{ marginRight: '4px' }} /> Remove Item
+                                        <Trash2 size={12} style={{ marginRight: '4px' }} /> {language === 'en' ? 'Remove Item' : 'ลบรายการ'}
                                     </button>
                                 </div>
                             ))}
                             <button className="btn btn-outline" style={{ width: '100%', borderRadius: '1rem' }} onClick={() => setMedicines([...medicines, { name: '', quantity: '', price: 0 }])}>
-                                + Add Medication
+                                + {t.consult.addPrescription}
                             </button>
                         </div>
 
@@ -598,11 +602,11 @@ export default function Consult() {
                             </div>
                             <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', marginBottom: '1rem' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '1.25rem', marginBottom: '1.5rem' }}>
-                                <span>Total Estimate</span>
+                                <span>{language === 'en' ? 'Total Estimate' : 'ยอดรวมประมาณการ'}</span>
                                 <span style={{ color: 'var(--primary)' }}>{medicines.reduce((sum, m) => sum + (Number(m.price) || 0), 0) + deliveryFee}฿</span>
                             </div>
                             <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={submitPrescription}>
-                                Save & Sync Records
+                                {t.consult.saveRecord}
                             </button>
                         </div>
                     </div>
@@ -622,10 +626,10 @@ export default function Consult() {
                         <div style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '1.5rem', borderRadius: '2rem', display: 'inline-flex', marginBottom: '2rem' }}>
                             <CheckCircle size={48} />
                         </div>
-                        <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '1rem' }}>Consultation Finished</h2>
-                        <p className="text-muted" style={{ marginBottom: '2.5rem' }}>Your reports and prescriptions have been synced successfully.</p>
+                        <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '1rem' }}>{language === 'en' ? 'Consultation Finished' : 'สิ้นสุดการปรึกษา'}</h2>
+                        <p className="text-muted" style={{ marginBottom: '2.5rem' }}>{language === 'en' ? 'Your reports and prescriptions have been synced successfully.' : 'บันทึกรายงานและการสั่งยาของคุณเรียบร้อยแล้ว'}</p>
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setActiveConsultation(null); setCallStatus('idle'); fetchIncomingPatients(); }}>
-                            Return to Dashboard
+                            {language === 'en' ? 'Return to Dashboard' : 'กลับสู่แผงควบคุม'}
                         </button>
                     </div>
                 </div>
@@ -636,8 +640,8 @@ export default function Consult() {
             <div className="container section-spacing" style={{ maxWidth: '800px' }}>
                 <div className="glass-card animate-fade-in" style={{ padding: '3rem' }}>
                     <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                        <h2 style={{ fontSize: '2.25rem', fontWeight: '800', marginBottom: '0.5rem' }}>Consultation Report</h2>
-                        <p className="text-muted">Review your medical summary and prescription</p>
+                        <h2 style={{ fontSize: '2.25rem', fontWeight: '800', marginBottom: '0.5rem' }}>{language === 'en' ? 'Consultation Report' : 'รายงานการตรวจรักษา'}</h2>
+                        <p className="text-muted">{language === 'en' ? 'Review your medical summary and prescription' : 'ตรวจสอบผลการตรวจและรายการยาของคุณ'}</p>
                     </div>
 
                     {summaryText && (
@@ -693,12 +697,12 @@ export default function Consult() {
                     {prescriptionStatus === 'confirmed_payment' ? (
                         <div className="animate-fade-in" style={{ background: 'var(--success-light)', color: 'var(--success)', padding: '2rem', borderRadius: '1.5rem', textAlign: 'center', marginTop: '2rem', border: '1px solid #10b981' }}>
                             <CheckCircle size={48} style={{ marginBottom: '1rem' }} />
-                            <h3 style={{ fontWeight: '800', marginBottom: '0.5rem' }}>Payment Confirmed</h3>
-                            <p style={{ opacity: 0.8 }}>Your medications are being packaged for dispatch.</p>
+                            <h3 style={{ fontWeight: '800', marginBottom: '0.5rem' }}>{language === 'en' ? 'Payment Confirmed' : 'ยืนยันการชำระเงินเรียบร้อย'}</h3>
+                            <p style={{ opacity: 0.8 }}>{language === 'en' ? 'Your medications are being packaged for dispatch.' : 'ยาของคุณกำลังอยู่ในขั้นตอนการจัดส่ง'}</p>
                         </div>
                     ) : (
                         <button className="btn btn-primary" onClick={confirmPayment} style={{ width: '100%', padding: '1.25rem', fontSize: '1.25rem', marginTop: '2rem' }}>
-                            Secure Checkout & Book Delivery
+                            {language === 'en' ? 'Secure Checkout & Book Delivery' : 'ชำระเงินและเรียกพนักงานส่งยา'}
                         </button>
                     )}
                 </div>
@@ -724,7 +728,7 @@ export default function Consult() {
                                 color: isDoctorOnline ? 'white' : '#10b981',
                                 borderColor: '#10b981'
                             }}>
-                            {isDoctorOnline ? '● You are Online' : '○ Go Online'}
+                            {isDoctorOnline ? (language === 'en' ? '● You are Online' : '● ออนไลน์อยู่') : (language === 'en' ? '○ Go Online' : '○ ออนไลน์')}
                         </button>
                         {incomingPatients.length > 0 && (
                             <button className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={clearAllWaiting}>
@@ -748,8 +752,8 @@ export default function Consult() {
                                 <div style={{ opacity: 0.1, marginBottom: '1.5rem' }}>
                                     <Video size={80} />
                                 </div>
-                                <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem' }}>No Virtual Requests</h4>
-                                <p className="text-muted">Wait for patients to request a consultation</p>
+                                <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem' }}>{language === 'en' ? 'No Virtual Requests' : 'ไม่มีคำขอปรึกษา'}</h4>
+                                <p className="text-muted">{language === 'en' ? 'Wait for patients to request a consultation' : 'รอรับคำปรึกษาจากผู้ป่วย'}</p>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -770,11 +774,11 @@ export default function Consult() {
                                             <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>{p.profiles?.first_name} {p.profiles?.last_name}</div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                 <Clock size={12} />
-                                                Waiting for {Math.floor((new Date() - new Date(p.created_at)) / 60000)} mins
+                                                {language === 'en' ? `Waiting for ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} mins` : `รอมาแล้ว ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} นาที`}
                                             </div>
                                         </div>
                                         <button className="btn btn-primary" onClick={() => callPatient(p)}>
-                                            <Video size={18} /> Start Video
+                                            <Video size={18} /> {t.consult.startConsult}
                                         </button>
                                     </div>
                                 ))}
@@ -795,8 +799,8 @@ export default function Consult() {
                         <div className="spinner" style={{ position: 'absolute', inset: 0, border: '4px solid var(--primary-light)', borderTopColor: 'var(--primary)', width: '80px', height: '80px' }}></div>
                         <Video size={40} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--primary)' }} />
                     </div>
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '1rem' }}>Requesting Doctor...</h3>
-                    <p className="text-muted" style={{ marginBottom: '3rem', lineHeight: '1.6' }}>We are notifying available doctors of your request. Please keep this browser window active.</p>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '1rem' }}>{language === 'en' ? 'Requesting Doctor...' : 'กำลังขอพบแพทย์...'}</h3>
+                    <p className="text-muted" style={{ marginBottom: '3rem', lineHeight: '1.6' }}>{language === 'en' ? 'We are notifying available doctors of your request. Please keep this browser window active.' : 'เรากำลังแจ้งเตือนแพทย์ที่พร้อมให้บริการ กรุณาสะบัดหน้าจอนี้ไว้'}</p>
                     <button onClick={cancelConsultation} className="btn btn-outline" style={{ width: '100%', borderColor: '#ef4444', color: '#ef4444' }}>
                         <XCircle size={18} /> Cancel Request
                     </button>
@@ -819,18 +823,18 @@ export default function Consult() {
                     {doctorsOnlineCount > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div className="badge badge-success" style={{ padding: '0.6rem 1rem', display: 'inline-flex', alignSelf: 'center', marginBottom: '0.5rem' }}>
-                                <UserCheck size={14} style={{ marginRight: '0.5rem' }} /> {doctorsOnlineCount} Doctor(s) Available Now
+                                <UserCheck size={14} style={{ marginRight: '0.5rem' }} /> {doctorsOnlineCount} {language === 'en' ? 'Doctor(s) Available Now' : 'ท่าน พร้อมให้บริการ'}
                             </div>
                             <button className="btn btn-primary" style={{ width: '100%', padding: '1.1rem' }} onClick={startConsultationRequest}>
-                                Connect to Doctor
+                                {t.consult.startConsult}
                                 <ChevronRight size={20} />
                             </button>
                         </div>
                     ) : (
                         <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#dc2626', padding: '1.5rem', borderRadius: '1.25rem' }}>
                             <AlertCircle size={24} style={{ marginBottom: '0.5rem' }} />
-                            <div style={{ fontWeight: '700' }}>Doctors Offline</div>
-                            <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>Virtual consultations are currently closed. Please try again later or visit the hospital.</p>
+                            <div style={{ fontWeight: '700' }}>{language === 'en' ? 'Doctors Offline' : 'ไม่มีแพทย์ออนไลน์'}</div>
+                            <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>{t.consult.noDoctors}</p>
                         </div>
                     )}
                 </div>

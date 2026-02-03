@@ -2,10 +2,14 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Truck, CheckCircle, Package, Clock, Phone, MapPinned, Pill, DollarSign, MoveRight, Loader2, ClipboardCheck, LayoutGrid, Hash } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
 export default function Delivery() {
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
+    const { language } = useLanguage()
+    const t = translations[language]
 
     useEffect(() => {
         fetchOrders()
@@ -37,7 +41,7 @@ export default function Delivery() {
     }
 
     const markAsShipped = async (id) => {
-        if (!confirm('Are you sure you want to mark this highly sensitive medical order as shipped?')) return
+        if (!confirm(language === 'en' ? 'Are you sure you want to mark this highly sensitive medical order as shipped?' : 'คุณแน่ใจหรือไม่ว่าต้องการระบุว่ารายการยานี้จัดส่งแล้ว?')) return
         const { error } = await supabase.from('prescriptions').update({ status: 'shipped' }).eq('id', id)
         if (error) {
             alert(error.message)
@@ -62,16 +66,16 @@ export default function Delivery() {
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
                             <Truck size={24} />
                         </div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>Fulfillment Center</h1>
+                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>{t.delivery.title}</h1>
                     </div>
-                    <p className="text-muted">Pharmacists & Medical Logistics Hub</p>
+                    <p className="text-muted">{language === 'en' ? 'Pharmacists & Medical Logistics Hub' : 'ศูนย์จัดการยาและโลจิสติกส์การแพทย์'}</p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.5rem' }}>
                     <div className="glass-card" style={{ padding: '0.75rem 1.5rem', background: 'white', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.5rem' }}><Package size={20} /></div>
                         <div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>Available</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>{language === 'en' ? 'Available' : 'คิวงาน'}</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{orders.length}</div>
                         </div>
                     </div>
@@ -83,8 +87,8 @@ export default function Delivery() {
                     <div style={{ width: '80px', height: '80px', background: 'var(--bg-color)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                         <ClipboardCheck size={40} style={{ opacity: 0.1 }} />
                     </div>
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.5rem' }}>Queue Cleared</h3>
-                    <p className="text-muted">All medical orders have been successfully processed and shipped.</p>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.5rem' }}>{language === 'en' ? 'Queue Cleared' : 'เคลียร์คิวแล้ว'}</h3>
+                    <p className="text-muted">{language === 'en' ? 'All medical orders have been successfully processed and shipped.' : 'รายการยาทั้งหมดถูกดำเนินการและจัดส่งเรียบร้อยแล้ว'}</p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gap: '2rem' }}>
@@ -103,7 +107,7 @@ export default function Delivery() {
                                     {/* Section 1: Logistics & Identity */}
                                     <div style={{ background: 'white', padding: '2rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                                            <span className="badge badge-success" style={{ padding: '0.25rem 0.6rem', fontSize: '0.65rem' }}>PAID & VERIFIED</span>
+                                            <span className="badge badge-success" style={{ padding: '0.25rem 0.6rem', fontSize: '0.65rem' }}>{language === 'en' ? 'PAID & VERIFIED' : 'ชำระเงินแล้ว'}</span>
                                             <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--primary)' }}>#{order.id.slice(0, 8)}</span>
                                         </div>
 
@@ -114,17 +118,17 @@ export default function Delivery() {
                                             <div>
                                                 <div style={{ fontSize: '1.125rem', fontWeight: '800' }}>{patient?.first_name} {patient?.last_name}</div>
                                                 <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    <Phone size={12} /> {patient?.phone || 'No Phone Registered'}
+                                                    <Phone size={12} /> {patient?.phone || (language === 'en' ? 'No Phone Registered' : 'ไม่พบหมายเลขโทรศัพท์')}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div style={{ background: 'var(--bg-color)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-                                                <MapPinned size={14} /> Shipping Destination
+                                                <MapPinned size={14} /> {language === 'en' ? 'Shipping Destination' : 'ที่อยู่จัดส่ง'}
                                             </div>
                                             <p style={{ fontSize: '0.875rem', lineHeight: '1.6', color: 'var(--text-main)', margin: 0 }}>
-                                                {patient?.house_no} {patient?.village ? `Moo ${patient?.village}` : ''} {patient?.road}<br />
+                                                {patient?.house_no} {patient?.village ? (language === 'en' ? `Moo ${patient?.village}` : `หมู่ ${patient?.village}`) : ''} {patient?.road}<br />
                                                 {patient?.sub_district}, {patient?.district}, {patient?.province} {patient?.zipcode}
                                             </p>
                                         </div>
@@ -133,7 +137,7 @@ export default function Delivery() {
                                     {/* Section 2: Medical Content */}
                                     <div style={{ background: 'rgba(255,255,255,0.7)', padding: '2rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '1.5rem', textTransform: 'uppercase' }}>
-                                            <Pill size={14} /> Medical Manifest (Dr. {doctor?.first_name})
+                                            <Pill size={14} /> {language === 'en' ? 'Medical Manifest' : 'รายการยา'} (Dr. {doctor?.first_name})
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                             {meds.map((m, i) => (
@@ -146,7 +150,7 @@ export default function Delivery() {
                                                 </div>
                                             ))}
                                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0.75rem', marginTop: '0.5rem', fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-muted)' }}>
-                                                <span>Logistics/Surcharge</span>
+                                                <span>{language === 'en' ? 'Logistics/Surcharge' : 'ค่าจัดส่ง'}</span>
                                                 <span>{order.delivery_fee}฿</span>
                                             </div>
                                         </div>
@@ -169,7 +173,7 @@ export default function Delivery() {
                                             onClick={() => markAsShipped(order.id)}
                                             className="btn btn-primary"
                                             style={{ width: '100%', height: '54px', borderRadius: '1rem', gap: '0.75rem', fontSize: '1rem', fontWeight: '700' }}>
-                                            Dispatch Order <MoveRight size={20} />
+                                            {language === 'en' ? 'Dispatch Order' : 'ส่งของ'} <MoveRight size={20} />
                                         </button>
                                     </div>
 

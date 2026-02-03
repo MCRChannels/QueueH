@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Users, Clock, Play, CheckCircle, Power, RefreshCw, UserCheck, ChevronRight, Loader2, Hospital, Zap, Trash2, UserPlus, Settings } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
 export default function DoctorOPD() {
     const [profile, setProfile] = useState(null)
@@ -9,6 +11,8 @@ export default function DoctorOPD() {
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [showSecretMenu, setShowSecretMenu] = useState(false)
+    const { language } = useLanguage()
+    const t = translations[language]
 
     useEffect(() => {
         fetchInitialData()
@@ -128,7 +132,7 @@ export default function DoctorOPD() {
     }
 
     const clearAllQueues = async () => {
-        if (!confirm('DEMO MODE: Clear all waiting patients and reset hospital counters?')) return
+        if (!confirm(language === 'en' ? 'DEMO MODE: Clear all waiting patients and reset hospital counters?' : 'โหมดสาธิต: ล้างคิวผู้ป่วยที่รออยู่และรีเซ็ตเลขคิวทั้งหมด?')) return
         setActionLoading(true)
         try {
             // 1. Cancel all waiting queues for this hospital
@@ -159,8 +163,8 @@ export default function DoctorOPD() {
                     <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '1.5rem', borderRadius: '1.5rem', display: 'inline-flex', marginBottom: '1.5rem' }}>
                         <Hospital size={40} />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>No Hospital Assigned</h2>
-                    <p className="text-muted">Please contact an administrator to assign you to a specific hospital OPD room.</p>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>{language === 'en' ? 'No Hospital Assigned' : 'ไม่พบสถานพยาบาลที่สังกัด'}</h2>
+                    <p className="text-muted">{language === 'en' ? 'Please contact an administrator to assign you to a specific hospital OPD room.' : 'กรุณาติดต่อผู้ดูแลระบบเพื่อระบุสถานพยาบาลที่คุณสังกัด'}</p>
                 </div>
             </div>
         )
@@ -174,10 +178,10 @@ export default function DoctorOPD() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>{hospital?.name}</h1>
                             <div className={`badge ${hospital?.is_open ? 'badge-success' : 'badge-danger'}`}>
-                                {hospital?.is_open ? 'Room Active' : 'Room Offline'}
+                                {hospital?.is_open ? (language === 'en' ? 'Room Active' : 'เปิดให้บริการ') : (language === 'en' ? 'Room Offline' : 'ปิดให้บริการ')}
                             </div>
                         </div>
-                        <p className="text-muted" style={{ marginTop: '0.25rem' }}>{profile.first_name} {profile.last_name} • Attending Doctor</p>
+                        <p className="text-muted" style={{ marginTop: '0.25rem' }}>{profile.first_name} {profile.last_name} • {language === 'en' ? 'Attending Doctor' : 'แพทย์ผู้รักษา'}</p>
                     </div>
                     <button
                         onClick={toggleOpen}
@@ -191,7 +195,7 @@ export default function DoctorOPD() {
                         {actionLoading ? <Loader2 className="spinner" size={18} /> : (
                             <>
                                 <Power size={18} />
-                                {hospital?.is_open ? 'End Shift' : 'Start Shift'}
+                                {hospital?.is_open ? (language === 'en' ? 'End Shift' : 'ปิดคิว') : (language === 'en' ? 'Start Shift' : 'เปิดคิว')}
                             </>
                         )}
                     </button>
@@ -204,13 +208,13 @@ export default function DoctorOPD() {
                     {/* Left Column: Controls & Stats */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         <div className="glass-card animate-fade-in" style={{ textAlign: 'center', padding: '2.5rem' }}>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Currently Serving</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>{language === 'en' ? 'Currently Serving' : 'หมายเลขที่กำลังเรียก'}</div>
                             <div style={{ fontSize: '5rem', fontWeight: '800', color: 'var(--primary)', lineHeight: '1', marginBottom: '1rem' }}>
                                 #{hospital?.current_queue || 0}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                                 <div className="badge badge-success">
-                                    <UserCheck size={14} style={{ marginRight: '0.4rem' }} /> In Progress
+                                    <UserCheck size={14} style={{ marginRight: '0.4rem' }} /> {language === 'en' ? 'In Progress' : 'กำลังทำการรักษา'}
                                 </div>
                             </div>
                         </div>
@@ -218,10 +222,10 @@ export default function DoctorOPD() {
                         <div className="glass-card animate-fade-in" style={{ textAlign: 'center', padding: '2rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                                 <Users size={20} color="var(--text-muted)" />
-                                <span className="text-muted" style={{ fontWeight: '600' }}>Waiting List</span>
+                                <span className="text-muted" style={{ fontWeight: '600' }}>{language === 'en' ? 'Waiting List' : 'ผู้รอรับบริการ'}</span>
                             </div>
                             <div style={{ fontSize: '2.5rem', fontWeight: '700' }}>{queues.length}</div>
-                            <p style={{ fontSize: '0.875rem' }} className="text-muted">Patients in queue</p>
+                            <p style={{ fontSize: '0.875rem' }} className="text-muted">{language === 'en' ? 'Patients in queue' : 'คิวที่รออยู่ทั้งหมด'}</p>
                         </div>
 
                         <button
@@ -242,10 +246,10 @@ export default function DoctorOPD() {
                                 <>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <Play size={24} fill="white" />
-                                        <span>Call Next Patient</span>
+                                        <span>{t.doctor.nextPatient}</span>
                                     </div>
                                     <span style={{ fontSize: '0.875rem', opacity: 0.8, fontWeight: '400' }}>
-                                        {queues.length > 0 ? `Next: #${queues[0].queue_number}` : 'No more patients'}
+                                        {queues.length > 0 ? (language === 'en' ? `Next: #${queues[0].queue_number}` : `คิวถัดไป: #${queues[0].queue_number}`) : (language === 'en' ? 'No more patients' : 'ไม่มีคิวที่รออยู่')}
                                     </span>
                                 </>
                             )}
@@ -270,8 +274,8 @@ export default function DoctorOPD() {
                                     <div style={{ opacity: 0.1, marginBottom: '1.5rem' }}>
                                         <Users size={80} />
                                     </div>
-                                    <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem' }}>Queue is Clear</h4>
-                                    <p>Relax, all patients have been served!</p>
+                                    <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem' }}>{language === 'en' ? 'Queue is Clear' : 'เคลียร์คิวหมดแล้ว'}</h4>
+                                    <p>{language === 'en' ? 'Relax, all patients have been served!' : 'พักผ่อนได้ ผู้ป่วยทุกคนได้รับการตรวจแล้ว!'}</p>
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -310,13 +314,13 @@ export default function DoctorOPD() {
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                         <Clock size={12} />
-                                                        Joined at {new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        {language === 'en' ? `Joined at ${new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : `เข้าคิวเมื่อ ${new Date(q.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                                                     </div>
                                                 </div>
                                             </div>
                                             {idx === 0 && (
                                                 <div className="badge badge-success" style={{ padding: '0.4rem 0.75rem' }}>
-                                                    First in line
+                                                    {language === 'en' ? 'First in line' : 'คิวถัดไป'}
                                                 </div>
                                             )}
                                         </div>
@@ -332,13 +336,13 @@ export default function DoctorOPD() {
             <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1rem' }}>
                 {showSecretMenu && (
                     <div className="glass-card animate-fade-in" style={{ padding: '1rem', width: '240px', background: 'rgba(15,23,42,0.95)', color: 'white', border: 'none' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: '800', opacity: 0.5, marginBottom: '1rem', textTransform: 'uppercase' }}>Demo Tools (Admin Only)</div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '800', opacity: 0.5, marginBottom: '1rem', textTransform: 'uppercase' }}>{language === 'en' ? 'Demo Tools (Admin Only)' : 'เครื่องมือสาธิต (สำหรับแอดมิน)'}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             <button onClick={mockAddQueue} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-                                <UserPlus size={18} color="#60a5fa" /> Mock Add Patient
+                                <UserPlus size={18} color="#60a5fa" /> {language === 'en' ? 'Mock Add Patient' : 'จำลองการเพิ่มผู้ป่วย'}
                             </button>
                             <button onClick={clearAllQueues} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-                                <Trash2 size={18} color="#ef4444" /> Reset Stats to 0
+                                <Trash2 size={18} color="#ef4444" /> {language === 'en' ? 'Reset Stats to 0' : 'รีเซ็ตสถิติเป็น 0'}
                             </button>
                         </div>
                     </div>

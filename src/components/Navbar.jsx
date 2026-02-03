@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Stethoscope, User, Calendar, LogOut, Truck, Shield, Building, Menu, X } from 'lucide-react'
+import { Stethoscope, User, Calendar, LogOut, Truck, Shield, Building, Menu, X, Globe } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
-export default function Navbar() {
+export default function Navbar({ session }) {
     const navigate = useNavigate()
     const location = useLocation()
     const [role, setRole] = useState(null)
+    const { language, toggleLanguage } = useLanguage()
+    const t = translations[language].navbar
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [scrolled, setScrolled] = useState(false)
 
     useEffect(() => {
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
+        const fetchRole = async () => {
             if (session) {
                 const { data } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
                 if (data) setRole(data.role)
+            } else {
+                setRole(null)
             }
-        })
+        }
+
+        fetchRole()
 
         const handleScroll = () => {
             setScrolled(window.scrollY > 20)
@@ -33,15 +41,15 @@ export default function Navbar() {
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
     const navLinks = [
-        { to: '/', label: 'Hospitals', icon: <Calendar size={20} /> },
-        { to: '/consult', label: 'Consult', icon: <Stethoscope size={20} /> },
-        { to: '/profile', label: 'Profile', icon: <User size={20} /> },
+        { to: '/', label: t.hospitals, icon: <Calendar size={20} /> },
+        { to: '/consult', label: t.consult, icon: <Stethoscope size={20} /> },
+        { to: '/profile', label: t.profile, icon: <User size={20} /> },
     ]
 
     const roleLinks = []
-    if (role === 'pharmacist') roleLinks.push({ to: '/delivery', label: 'Pharmacy', icon: <Truck size={20} />, color: '#10b981' })
-    if (role === 'admin') roleLinks.push({ to: '/admin', label: 'Admin', icon: <Shield size={20} />, color: 'var(--primary)' })
-    if (role === 'doctor_opd') roleLinks.push({ to: '/opd', label: 'My OPD', icon: <Building size={20} />, color: 'var(--primary)' })
+    if (role === 'pharmacist') roleLinks.push({ to: '/delivery', label: t.delivery, icon: <Truck size={20} />, color: '#10b981' })
+    if (role === 'admin') roleLinks.push({ to: '/admin', label: t.admin, icon: <Shield size={20} />, color: 'var(--primary)' })
+    if (role === 'doctor_opd') roleLinks.push({ to: '/opd', label: t.opd, icon: <Building size={20} />, color: 'var(--primary)' })
 
     const allLinks = [...navLinks, ...roleLinks]
 
@@ -99,13 +107,45 @@ export default function Navbar() {
                             {link.label}
                         </Link>
                     ))}
+                    {/* Language Toggle */}
                     <button
-                        onClick={handleLogout}
-                        className="btn btn-outline"
-                        style={{ marginLeft: '1rem', padding: '0.6rem 1.25rem' }}
+                        onClick={toggleLanguage}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0.6rem 1rem',
+                            background: 'white',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '0.75rem',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            color: 'var(--text-main)',
+                            marginLeft: '0.5rem'
+                        }}
                     >
-                        <LogOut size={18} /> Logout
+                        <Globe size={16} />
+                        {language === 'en' ? 'TH | EN' : 'EN | TH'}
                     </button>
+
+                    {session ? (
+                        <button
+                            onClick={handleLogout}
+                            className="btn btn-outline"
+                            style={{ marginLeft: '1rem', padding: '0.6rem 1.25rem' }}
+                        >
+                            <LogOut size={18} /> {t.logout}
+                        </button>
+                    ) : (
+                        <Link
+                            to="/login"
+                            className="btn btn-primary"
+                            style={{ marginLeft: '1rem', padding: '0.6rem 1.25rem', textDecoration: 'none' }}
+                        >
+                            {t.login}
+                        </Link>
+                    )}
                 </div>
 
                 {/* Mobile Hamburger Toggle */}
@@ -139,7 +179,10 @@ export default function Navbar() {
                         gap: '0.5rem',
                         marginTop: '0.5rem',
                         margin: '0.5rem 1rem',
-                        borderRadius: '1rem'
+                        borderRadius: '1rem',
+                        background: 'white', /* Force solid background for readability */
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+                        border: '1px solid var(--border-color)',
                     }}
                 >
                     {allLinks.map(link => (
@@ -163,13 +206,48 @@ export default function Navbar() {
                             {link.label}
                         </Link>
                     ))}
+                    {/* Mobile Language Toggle */}
                     <button
-                        onClick={() => { handleLogout(); setIsMenuOpen(false); }}
-                        className="btn btn-danger"
-                        style={{ marginTop: '1rem', justifyContent: 'center', width: '100%' }}
+                        onClick={toggleLanguage}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.8rem',
+                            padding: '1rem',
+                            background: 'white',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '0.75rem',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            fontWeight: '700',
+                            color: 'var(--text-main)',
+                            width: '100%',
+                            marginTop: '0.5rem'
+                        }}
                     >
-                        <LogOut size={18} /> Logout
+                        <Globe size={20} />
+                        {language === 'en' ? 'เปลี่ยนเป็นภาษาไทย' : 'Switch to English'}
                     </button>
+
+                    {session ? (
+                        <button
+                            onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                            className="btn btn-danger"
+                            style={{ marginTop: '1rem', justifyContent: 'center', width: '100%' }}
+                        >
+                            <LogOut size={18} /> {t.logout}
+                        </button>
+                    ) : (
+                        <Link
+                            to="/login"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="btn btn-primary"
+                            style={{ marginTop: '1rem', justifyContent: 'center', width: '100%', textDecoration: 'none' }}
+                        >
+                            {t.login}
+                        </Link>
+                    )}
                 </div>
             )}
 

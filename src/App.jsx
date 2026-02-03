@@ -10,6 +10,8 @@ import Delivery from './pages/Delivery'
 import AdminDashboard from './pages/AdminDashboard'
 import DoctorOPD from './pages/DoctorOPD'
 import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+import { supabase } from './lib/supabase'
 
 function App() {
   const [session, setSession] = React.useState(null)
@@ -28,7 +30,18 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) return null // Or a global spinner
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-color)' }}>
+      <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTop: '3px solid var(--primary)', borderRadius: '50%', margin: '0 auto 1rem' }}></div>
+        <p style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Initializing Secure Session...</p>
+      </div>
+      <style>{`
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  )
 
   return (
     <BrowserRouter>
@@ -37,23 +50,21 @@ function App() {
           <Route path="/login" element={session ? <Navigate to="/" /> : <Login />} />
           <Route path="/register" element={session ? <Navigate to="/" /> : <Register />} />
 
-          {/* Protected Routes Wrapper */}
           <Route path="*" element={
-            session ? (
-              <>
-                <Navbar />
-                <div style={{ padding: '2rem 0' }}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/consult" element={<Consult />} />
-                    <Route path="/delivery" element={<Delivery />} />
-                    <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/opd" element={<DoctorOPD />} />
-                    <Route path="/profile" element={<Profile />} />
-                  </Routes>
-                </div>
-              </>
-            ) : <Navigate to="/login" />
+            <>
+              <Navbar session={session} />
+              <div style={{ padding: '2rem 0' }}>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/consult" element={session ? <Consult /> : <Navigate to="/login" />} />
+                  <Route path="/delivery" element={session ? <Delivery /> : <Navigate to="/login" />} />
+                  <Route path="/admin" element={session ? <AdminDashboard /> : <Navigate to="/login" />} />
+                  <Route path="/opd" element={session ? <DoctorOPD /> : <Navigate to="/login" />} />
+                  <Route path="/profile" element={session ? <Profile /> : <Navigate to="/login" />} />
+                </Routes>
+              </div>
+              <Footer />
+            </>
           } />
         </Routes>
       </div>

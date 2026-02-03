@@ -2,10 +2,14 @@ import React, { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate, Link } from 'react-router-dom'
 import { Stethoscope, Lock, Mail, User as UserIcon, Loader2 } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
 export default function Login() {
     const navigate = useNavigate()
     const [loading, setLoading] = useState(true) // Start with loading to check session
+    const { language } = useLanguage()
+    const t = translations[language]
     const [identifier, setIdentifier] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState(null)
@@ -36,7 +40,7 @@ export default function Login() {
                     .single()
 
                 if (profileError || !data) {
-                    throw new Error('Username not found or invalid credentials')
+                    throw new Error(language === 'en' ? 'Username not found or invalid credentials' : 'ไม่พบชื่อผู้ใช้ หรือข้อมูลประจำตัวไม่ถูกต้อง')
                 }
                 emailToUse = data.email
             }
@@ -78,8 +82,8 @@ export default function Login() {
                     }}>
                         <Stethoscope size={32} />
                     </div>
-                    <h2 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>Welcome Back</h2>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Login to manage your medical queue</p>
+                    <h2 style={{ fontSize: '1.875rem', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '-0.025em' }}>{t.auth.loginTitle}</h2>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>{t.auth.loginSubtitle}</p>
                 </div>
 
                 {error && (
@@ -101,7 +105,7 @@ export default function Login() {
 
                 <form onSubmit={handleLogin} style={{ display: 'grid', gap: '1.5rem' }}>
                     <div style={{ display: 'grid', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-main)' }}>Email or Username</label>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-main)' }}>{t.auth.identifier}</label>
                         <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
                                 <Mail size={18} />
@@ -119,7 +123,7 @@ export default function Login() {
                     </div>
 
                     <div style={{ display: 'grid', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-main)' }}>Password</label>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-main)' }}>{t.auth.password}</label>
                         <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
                                 <Lock size={18} />
@@ -137,14 +141,14 @@ export default function Login() {
                     </div>
 
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} disabled={loading}>
-                        {loading ? <Loader2 className="spinner" size={18} /> : 'Sign In'}
+                        {loading ? <Loader2 className="spinner" size={18} /> : t.auth.signIn}
                     </button>
                 </form>
 
                 <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Don't have an account? </span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{t.auth.noAccount} </span>
                     <Link to="/register" style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.875rem', textDecoration: 'none' }}>
-                        Create Account
+                        {t.auth.registerNow}
                     </Link>
                 </div>
             </div>

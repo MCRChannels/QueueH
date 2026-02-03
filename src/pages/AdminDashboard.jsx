@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Users, Building, Plus, Trash2, Edit2, Check, X, Shield, Search, LayoutGrid, BarChart3, Settings, ShieldCheck, UserPlus, MoreVertical, Loader2, MoreHorizontal } from 'lucide-react'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../lib/translations'
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users')
@@ -9,6 +11,8 @@ export default function AdminDashboard() {
     const [hospitals, setHospitals] = useState([])
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
+    const { language } = useLanguage()
+    const t = translations[language]
 
     // New Hospital State
     const [newHospital, setNewHospital] = useState({ name: '', total_queues: 0, current_queue: 0, avg_waiting_time: 0 })
@@ -69,7 +73,7 @@ export default function AdminDashboard() {
     }
 
     const deleteHospital = async (id) => {
-        if (!confirm('Are you sure? This will delete all associated data.')) return
+        if (!confirm(language === 'en' ? 'Are you sure? This will delete all associated data.' : 'คุณแน่ใจหรือไม่? การดำเนินการนี้จะลบข้อมูลที่เกี่ยวข้องทั้งหมด')) return
         setActionLoading(true)
         const { error } = await supabase.from('hospitals').delete().eq('id', id)
         if (error) alert(error.message)
@@ -101,9 +105,9 @@ export default function AdminDashboard() {
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
                             <Shield size={24} />
                         </div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>Command Center</h1>
+                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>{t.admin.title}</h1>
                     </div>
-                    <p className="text-muted">System Administration & Oversight</p>
+                    <p className="text-muted">{language === 'en' ? 'System Administration & Oversight' : 'ระบบจัดการและดูแลความเรียบร้อย'}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <div className="glass" style={{ display: 'flex', padding: '0.35rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.7)' }}>
@@ -118,7 +122,7 @@ export default function AdminDashboard() {
                                 boxShadow: activeTab === 'users' ? undefined : 'none'
                             }}>
                             <Users size={18} />
-                            Users
+                            {language === 'en' ? 'Users' : 'ผู้ใช้งาน'}
                         </button>
                         <button
                             onClick={() => setActiveTab('hospitals')}
@@ -131,7 +135,7 @@ export default function AdminDashboard() {
                                 boxShadow: activeTab === 'hospitals' ? undefined : 'none'
                             }}>
                             <Building size={18} />
-                            Hospitals
+                            {language === 'en' ? 'Hospitals' : 'สถานพยาบาล'}
                         </button>
                     </div>
                 </div>
@@ -145,7 +149,7 @@ export default function AdminDashboard() {
                         <span className="badge badge-success">+12%</span>
                     </div>
                     <div style={{ fontSize: '1.75rem', fontWeight: '800' }}>{users.length}</div>
-                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>Registered Patients</div>
+                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>{language === 'en' ? 'Registered Patients' : 'ผู้ป่วยที่ลงทะเบียน'}</div>
                 </div>
                 <div className="glass-card animate-fade-in" style={{ padding: '1.5rem', background: 'white', animationDelay: '0.1s' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -153,7 +157,7 @@ export default function AdminDashboard() {
                         <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>Live</span>
                     </div>
                     <div style={{ fontSize: '1.75rem', fontWeight: '800' }}>{hospitals.filter(h => h.is_open).length}</div>
-                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>Active Medical Facilities</div>
+                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>{language === 'en' ? 'Active Medical Facilities' : 'สถานพยาบาลที่เปิดทำการ'}</div>
                 </div>
                 <div className="glass-card animate-fade-in" style={{ padding: '1.5rem', background: 'white', animationDelay: '0.2s' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -161,34 +165,34 @@ export default function AdminDashboard() {
                         <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>Global</span>
                     </div>
                     <div style={{ fontSize: '1.75rem', fontWeight: '800' }}>{hospitals.reduce((acc, h) => acc + (h.total_queues || 0), 0)}</div>
-                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>Total Daily Sessions</div>
+                    <div className="text-muted" style={{ fontSize: '0.875rem', fontWeight: '500' }}>{language === 'en' ? 'Total Daily Sessions' : 'จำนวนคิวสะสมวันนี้'}</div>
                 </div>
                 <div className="glass-card animate-fade-in" style={{ padding: '1.5rem', background: 'var(--primary)', color: 'white', animationDelay: '0.3s' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '0.5rem' }}><ShieldCheck size={20} /></div>
                     </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>System Status</div>
-                    <div style={{ fontSize: '0.875rem', opacity: 0.8, fontWeight: '500', marginTop: '0.25rem' }}>All services operational</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{language === 'en' ? 'System Status' : 'สถานะระบบ'}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.8, fontWeight: '500', marginTop: '0.25rem' }}>{language === 'en' ? 'All services operational' : 'ทุกบริการปกติ'}</div>
                 </div>
             </div>
 
             {activeTab === 'users' ? (
                 <div className="glass-card animate-fade-in" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>System Users</h3>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>{language === 'en' ? 'System Users' : 'ผู้ใช้งานระบบ'} ({users.length})</h3>
                         <div style={{ position: 'relative' }}>
                             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input className="input" placeholder="Search accounts..." style={{ paddingLeft: '2.75rem', width: '280px', height: '42px', borderRadius: '0.75rem' }} />
+                            <input className="input" placeholder={language === 'en' ? "Search accounts..." : "ค้นหาบัญชี..."} style={{ paddingLeft: '2.75rem', width: '280px', height: '42px', borderRadius: '0.75rem' }} />
                         </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    <th style={{ textAlign: 'left', padding: '1rem 2rem' }}>Identity</th>
-                                    <th style={{ textAlign: 'left', padding: '1rem' }}>Security Role</th>
-                                    <th style={{ textAlign: 'left', padding: '1rem' }}>Affiliation</th>
-                                    <th style={{ textAlign: 'right', padding: '1rem 2rem' }}>Management</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem 2rem' }}>{language === 'en' ? 'Identity' : 'ข้อมูล'}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem' }}>{language === 'en' ? 'Security Role' : 'บทบาท'}</th>
+                                    <th style={{ textAlign: 'left', padding: '1rem' }}>{language === 'en' ? 'Affiliation' : 'สังกัด'}</th>
+                                    <th style={{ textAlign: 'right', padding: '1rem 2rem' }}>{language === 'en' ? 'Management' : 'จัดการ'}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -205,8 +209,8 @@ export default function AdminDashboard() {
                                                     {u.first_name?.[0].toUpperCase() || 'U'}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{u.first_name || 'Incognito'} {u.last_name || ''}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{u.username || 'unidentified'}</div>
+                                                    <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{u.first_name || (language === 'en' ? 'Incognito' : 'ไม่ระบุชื่อ')} {u.last_name || ''}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{u.username || (language === 'en' ? 'unidentified' : 'ไม่มีไอดี')}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -216,11 +220,11 @@ export default function AdminDashboard() {
                                                 value={u.role || 'patient'}
                                                 onChange={(e) => updateUserRole(u.id, e.target.value)}
                                                 className="input" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', background: 'white', cursor: 'pointer', borderRadius: '0.6rem' }}>
-                                                <option value="patient">Patient</option>
-                                                <option value="doctor_online">Doctor (Online)</option>
-                                                <option value="doctor_opd">Doctor (OPD)</option>
-                                                <option value="pharmacist">Pharmacist</option>
-                                                <option value="admin">Admin</option>
+                                                <option value="patient">{language === 'en' ? 'Patient' : 'ผู้ป่วย'}</option>
+                                                <option value="doctor_online">{language === 'en' ? 'Doctor (Online)' : 'แพทย์ (ออนไลน์)'}</option>
+                                                <option value="doctor_opd">{language === 'en' ? 'Doctor (OPD)' : 'แพทย์ (OPD)'}</option>
+                                                <option value="pharmacist">{language === 'en' ? 'Pharmacist' : 'เภสัชกร'}</option>
+                                                <option value="admin">{language === 'en' ? 'Admin' : 'ผู้ดูแลระบบ'}</option>
                                             </select>
                                         </td>
                                         <td style={{ padding: '1.25rem 1rem' }}>
@@ -229,7 +233,7 @@ export default function AdminDashboard() {
                                                 value={u.hospital_id || ''}
                                                 onChange={(e) => updateUserHospital(u.id, e.target.value)}
                                                 className="input" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8125rem', height: 'auto', background: 'white', cursor: 'pointer', maxWidth: '180px', borderRadius: '0.6rem' }}>
-                                                <option value="">None / External</option>
+                                                <option value="">{language === 'en' ? 'None / External' : 'ไม่มี / อื่นๆ'}</option>
                                                 {hospitals.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                                             </select>
                                         </td>
@@ -250,12 +254,12 @@ export default function AdminDashboard() {
                             <div className="glass-card" style={{ padding: '2rem', sticky: 'top' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                     <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.5rem' }}><Plus size={20} /></div>
-                                    <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>Register Facility</h3>
+                                    <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>{language === 'en' ? 'Register Facility' : 'เพิ่มสถานพยาบาล'}</h3>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-muted)' }}>Hospital Full Name</div>
+                                    <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-muted)' }}>{language === 'en' ? 'Hospital Full Name' : 'ชื่อสถานพยาบาล'}</div>
                                     <input
-                                        className="input" placeholder="e.g. Central City Medical"
+                                        className="input" placeholder={language === 'en' ? "e.g. Central City Medical" : "เช่น โรงพยาบาลรวมเมือง"}
                                         value={newHospital.name} onChange={e => setNewHospital({ ...newHospital, name: e.target.value })}
                                         style={{ height: '48px', borderRadius: '0.75rem', marginBottom: '1rem' }}
                                     />
@@ -264,7 +268,7 @@ export default function AdminDashboard() {
                                         onClick={addHospital}
                                         disabled={!newHospital.name || actionLoading}
                                         style={{ width: '100%', height: '48px', borderRadius: '0.75rem' }}>
-                                        {actionLoading ? <Loader2 className="spinner" size={20} /> : 'Initialize Facility'}
+                                        {actionLoading ? <Loader2 className="spinner" size={20} /> : (language === 'en' ? 'Initialize Facility' : 'เพิ่มเข้าระบบ')}
                                     </button>
                                 </div>
                             </div>
@@ -277,9 +281,9 @@ export default function AdminDashboard() {
                                         <div>
                                             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.25rem' }}>{h.name}</h3>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: h.is_open ? '#10b981' : '#ef4444' }}></div>
+                                                <div style={{ width: '80px', height: '8px', borderRadius: '50%', background: h.is_open ? '#10b981' : '#ef4444' }}></div>
                                                 <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                                    {h.is_open ? 'Online' : 'Offline'}
+                                                    {h.is_open ? (language === 'en' ? 'Online' : 'ออนไลน์') : (language === 'en' ? 'Offline' : 'ออฟไลน์')}
                                                 </span>
                                             </div>
                                         </div>
@@ -287,7 +291,7 @@ export default function AdminDashboard() {
                                             <button
                                                 onClick={() => toggleHospitalStatus(h)}
                                                 className="btn-icon"
-                                                title={h.is_open ? 'Close Facility' : 'Open Facility'}
+                                                title={h.is_open ? (language === 'en' ? 'Close Facility' : 'ปิดสถานพยาบาล') : (language === 'en' ? 'Open Facility' : 'เปิดสถานพยาบาล')}
                                                 style={{ borderRadius: '0.6rem', background: h.is_open ? '#f0fdf4' : '#fef2f2', color: h.is_open ? '#166534' : '#991b1b', border: '1px solid transparent' }}>
                                                 {h.is_open ? <Check size={18} /> : <X size={18} />}
                                             </button>
@@ -302,11 +306,11 @@ export default function AdminDashboard() {
 
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-color)', borderRadius: '1rem' }}>
                                         <div>
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>TOTAL TRAFFIC</div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>{language === 'en' ? 'TOTAL TRAFFIC' : 'คิวทั้งหมด'}</div>
                                             <div style={{ fontSize: '1rem', fontWeight: '700' }}>{h.total_queues}</div>
                                         </div>
                                         <div>
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>CURRENT</div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>{language === 'en' ? 'CURRENT' : 'กำลังเรียก'}</div>
                                             <div style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary)' }}>#{h.current_queue}</div>
                                         </div>
                                     </div>
