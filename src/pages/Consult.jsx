@@ -264,13 +264,27 @@ export default function Consult() {
 
 
     const getMediaStream = async () => {
+        // Ensure any previous tracks are stopped to free up the device
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop())
+        }
+
         try {
             return await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         } catch (err) {
+            console.warn('Media access error:', err.name, err.message)
+
             // Fallback: If camera is messed up/busy, try audio only
             if (err.name === 'NotReadableError' || err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
-                console.warn('Video failed, trying audio only', err)
-                return await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+                console.warn('Video failed, trying audio only')
+                try {
+                    return await navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+                } catch (audioErr) {
+                    if (audioErr.name === 'NotReadableError') {
+                        alert(language === 'en' ? 'Camera/Mic is being used by another app. Please close other apps and try again.' : 'กล้องหรือไมโครโฟนถูกใช้งานโดยแอปอื่น กรุณาปิดแอปอื่นแล้วลองใหม่')
+                    }
+                    throw audioErr
+                }
             }
             throw err
         }
