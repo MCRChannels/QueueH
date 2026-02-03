@@ -20,6 +20,7 @@ export default function Consult() {
 
     // Call State
     const [myPeerId, setMyPeerId] = useState(null)
+    const [remoteStream, setRemoteStream] = useState(null)
     const [callStatus, setCallStatus] = useState('idle')
     const [isLocalAudioOnly, setIsLocalAudioOnly] = useState(false)
     const [isRemoteAudioOnly, setIsRemoteAudioOnly] = useState(false)
@@ -39,6 +40,14 @@ export default function Consult() {
     const [medicines, setMedicines] = useState([])
     const [summaryText, setSummaryText] = useState('')
     const [deliveryFee] = useState(50)
+
+    // Stream Handling Effect
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream
+            remoteVideoRef.current.play().catch(e => console.error('Error auto-playing video:', e))
+        }
+    }, [remoteStream, callStatus])
 
     // -- INIT --
     useEffect(() => {
@@ -70,9 +79,10 @@ export default function Consult() {
                     callRef.current = call
 
                     call.on('stream', (remoteStream) => {
+                        console.log('Received remote stream (Incoming Call)')
                         setCallStatus('connected')
+                        setRemoteStream(remoteStream)
                         setIsRemoteAudioOnly(remoteStream.getVideoTracks().length === 0)
-                        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
                     })
 
                     call.on('close', () => endCall())
@@ -354,9 +364,10 @@ export default function Consult() {
             setActiveConsultation(consultation)
 
             call.on('stream', (remoteStream) => {
+                console.log('Received remote stream (Outgoing Call)')
                 setCallStatus('connected')
+                setRemoteStream(remoteStream)
                 setIsRemoteAudioOnly(remoteStream.getVideoTracks().length === 0)
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream
             })
 
             call.on('close', () => endCall())
@@ -406,6 +417,7 @@ export default function Consult() {
 
         callRef.current = null
         localStreamRef.current = null
+        setRemoteStream(null)
 
         setCallStatus('summary')
 
