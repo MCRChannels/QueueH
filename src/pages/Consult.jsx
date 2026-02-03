@@ -62,7 +62,14 @@ export default function Consult() {
         })
 
         if (!peerRef.current) {
-            const peer = new Peer()
+            const peer = new Peer({
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ]
+                }
+            })
             peerRef.current = peer
 
             peer.on('open', (id) => {
@@ -587,7 +594,19 @@ export default function Consult() {
                             autoPlay
                             playsInline
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            onPlaying={() => console.log('Video playing')}
+                            onWaiting={() => console.log('Video buffering/waiting')}
+                            onStalled={() => console.log('Video stalled')}
                         />
+
+                        {/* Manual Play Button for iOS if stubborn */}
+                        <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
+                            <button
+                                onClick={() => remoteVideoRef.current && remoteVideoRef.current.play()}
+                                style={{ background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid white', borderRadius: '20px', padding: '5px 15px', fontSize: '12px' }}>
+                                Tap to Retry Video
+                            </button>
+                        </div>
 
                         {/* Self View (Pip) */}
                         <div style={{
