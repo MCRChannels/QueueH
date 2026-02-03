@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Peer } from 'peerjs'
-import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, XCircle, Trash2, CheckCircle, UserCheck, ChevronRight, Loader2, Hospital, AlertCircle, Clock } from 'lucide-react'
+import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, XCircle, Trash2, CheckCircle, UserCheck, ChevronRight, Loader2, Hospital, AlertCircle, Clock, Stethoscope } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 
@@ -40,6 +40,9 @@ export default function Consult() {
     const [medicines, setMedicines] = useState([])
     const [summaryText, setSummaryText] = useState('')
     const [deliveryFee] = useState(50)
+
+    // UI State
+    const [showMedicalPanel, setShowMedicalPanel] = useState(window.innerWidth > 768)
 
     // Stream Handling Effect
     useEffect(() => {
@@ -354,6 +357,13 @@ export default function Consult() {
         try {
             setCallStatus('connecting')
             const stream = await getMediaStream()
+
+            // Safety Check: Component might have unmounted or peer destroyed during await
+            if (!peerRef.current) {
+                console.warn('Peer connection closed during media setup')
+                return
+            }
+
             localStreamRef.current = stream
             setIsLocalAudioOnly(stream.getVideoTracks().length === 0)
 
@@ -496,12 +506,19 @@ export default function Consult() {
     // 1. VIDEO ROOM UI
     if (callStatus === 'connected' || callStatus === 'connecting') {
         const isDoctor = profile.role === 'doctor_online' || profile.role === 'admin'
-        const [showMedicalPanel, setShowMedicalPanel] = useState(window.innerWidth > 768)
+        const isMobile = window.innerWidth <= 768
 
         return (
-            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0f172a', zIndex: 9999, display: 'flex', flexDirection: window.innerWidth <= 768 ? 'column' : 'row' }}>
-                {/* Main Content Area */}
-                <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', height: window.innerWidth <= 768 && showMedicalPanel ? '50%' : '100%' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0f172a', zIndex: 9999, display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+                {/* Main Content Area (Video) */}
+                <div style={{
+                    flex: 1,
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: isMobile && showMedicalPanel ? '35%' : '100%',
+                    transition: 'height 0.3s ease'
+                }}>
 
                     {/* Remote Video Container */}
                     <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -521,56 +538,80 @@ export default function Consult() {
 
                         {/* Self View (Pip) */}
                         <div style={{
-                            position: 'absolute', top: '1.5rem', right: '1.5rem',
-                            width: window.innerWidth <= 768 ? '120px' : '240px',
-                            height: window.innerWidth <= 768 ? '90px' : '180px',
-                            borderRadius: '1.25rem', border: '2px solid rgba(255,255,255,0.2)',
+                            position: 'absolute', top: '1rem', right: '1rem',
+                            width: isMobile ? '100px' : '240px',
+                            height: isMobile ? '75px' : '180px',
+                            borderRadius: '1rem', border: '2px solid rgba(255,255,255,0.2)',
                             overflow: 'hidden', background: '#334155',
-                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
                             zIndex: 20
                         }}>
                             <video ref={myVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                         </div>
+
+                        {/* Mobile Controls (Top-Left overlay so they don't block bottom form) */}
+                        {isMobile && (
+                            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', display: 'flex', gap: '0.5rem', zIndex: 30 }}>
+                                <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '45px', height: '45px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.9)' : 'rgba(239, 68, 68, 0.9)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                                </button>
+                                <button onClick={endCall} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)' }}>
+                                    <PhoneOff size={20} />
+                                </button>
+                                {isDoctor && !showMedicalPanel && (
+                                    <button onClick={() => setShowMedicalPanel(true)} style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'white', border: 'none', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)' }}>
+                                        <Stethoscope size={20} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Integrated Controls Bar */}
-                    <div style={{ padding: '2rem', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 30, pointerEvents: 'none' }}>
-                        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1rem' }}>
-                            <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
-                            </button>
-                            <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isVideoEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
-                            </button>
-                            <button onClick={endCall} style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <PhoneOff size={24} />
-                            </button>
-                            {isDoctor && (
-                                <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{ width: '60px', height: '60px', borderRadius: '50%', background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.2)', border: 'none', color: showMedicalPanel ? 'var(--primary)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Stethoscope size={24} />
+                    {!isMobile && (
+                        <div style={{ padding: '2rem', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 30, pointerEvents: 'none' }}>
+                            <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1rem' }}>
+                                <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
                                 </button>
-                            )}
+                                <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isVideoEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
+                                </button>
+                                <button onClick={endCall} style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <PhoneOff size={24} />
+                                </button>
+                                {isDoctor && (
+                                    <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{ width: '60px', height: '60px', borderRadius: '50%', background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.2)', border: 'none', color: showMedicalPanel ? 'var(--primary)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Stethoscope size={24} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Doctor Sidebar - Professional Medical Notes */}
                 {isDoctor && showMedicalPanel && (
                     <div className="animate-fade-in" style={{
-                        width: window.innerWidth <= 768 ? '100%' : '400px',
-                        height: window.innerWidth <= 768 ? '50%' : '100%',
+                        width: isMobile ? '100%' : '400px',
+                        height: isMobile ? '65%' : '100%',
                         background: 'white',
                         padding: '1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
                         overflowY: 'auto',
-                        borderLeft: window.innerWidth > 768 ? '1px solid var(--border-color)' : 'none',
-                        borderTop: window.innerWidth <= 768 ? '1px solid var(--border-color)' : 'none',
-                        zIndex: 40
+                        borderLeft: !isMobile ? '1px solid var(--border-color)' : 'none',
+                        borderTop: isMobile ? '4px solid var(--primary)' : 'none',
+                        zIndex: 40,
+                        boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.1)' : 'none'
                     }}>
                         <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>{t.consult.writeSummary}</h3>
-                            {window.innerWidth <= 768 && <button onClick={() => setShowMedicalPanel(false)} style={{ background: 'none', border: 'none' }}><XCircle color="var(--text-muted)" /></button>}
+                            {isMobile && (
+                                <button onClick={() => setShowMedicalPanel(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <ChevronRight size={20} style={{ transform: 'rotate(90deg)', color: 'var(--text-muted)' }} />
+                                </button>
+                            )}
                         </div>
 
                         <textarea
