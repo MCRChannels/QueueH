@@ -12,28 +12,48 @@ import DoctorOPD from './pages/DoctorOPD'
 import Navbar from './components/Navbar'
 
 function App() {
+  const [session, setSession] = React.useState(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loading) return null // Or a global spinner
+
   return (
     <BrowserRouter>
-      {/* We can conditionally render Navbar if we want to hide it on Login/Register */}
-      {/* For now, let's keep it simple and maybe hide it based on route or just show it */}
       <div>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={session ? <Navigate to="/" /> : <Login />} />
+          <Route path="/register" element={session ? <Navigate to="/" /> : <Register />} />
+
+          {/* Protected Routes Wrapper */}
           <Route path="*" element={
-            <>
-              <Navbar />
-              <div style={{ padding: '2rem 0' }}>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/consult" element={<Consult />} />
-                  <Route path="/delivery" element={<Delivery />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/opd" element={<DoctorOPD />} />
-                  <Route path="/profile" element={<Profile />} />
-                </Routes>
-              </div>
-            </>
+            session ? (
+              <>
+                <Navbar />
+                <div style={{ padding: '2rem 0' }}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/consult" element={<Consult />} />
+                    <Route path="/delivery" element={<Delivery />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/opd" element={<DoctorOPD />} />
+                    <Route path="/profile" element={<Profile />} />
+                  </Routes>
+                </div>
+              </>
+            ) : <Navigate to="/login" />
           } />
         </Routes>
       </div>

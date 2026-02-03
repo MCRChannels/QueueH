@@ -5,10 +5,20 @@ import { Stethoscope, Lock, Mail, User as UserIcon, Loader2 } from 'lucide-react
 
 export default function Login() {
     const navigate = useNavigate()
-    const [loading, setLoading] = useState(false)
-    const [identifier, setIdentifier] = useState('') // Email or Username
+    const [loading, setLoading] = useState(true) // Start with loading to check session
+    const [identifier, setIdentifier] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState(null)
+
+    React.useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                navigate('/')
+            } else {
+                setLoading(false)
+            }
+        })
+    }, [navigate])
 
     const handleLogin = async (e) => {
         e.preventDefault()

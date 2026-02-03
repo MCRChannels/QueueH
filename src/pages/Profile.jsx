@@ -13,7 +13,11 @@ export default function Profile() {
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session)
-            if (session) fetchData(session.user.id)
+            if (session) {
+                fetchData(session.user.id)
+            } else {
+                setLoading(false)
+            }
         })
     }, [])
 
