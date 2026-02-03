@@ -65,8 +65,27 @@ export default function Consult() {
             const peer = new Peer({
                 config: {
                     iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' }
+                        { urls: "stun:stun.relay.metered.ca:80" },
+                        {
+                            urls: "turn:global.relay.metered.ca:80",
+                            username: "39da8a42505447326d3d41f8",
+                            credential: "lbO4fkpwjUvsjBhp",
+                        },
+                        {
+                            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                            username: "39da8a42505447326d3d41f8",
+                            credential: "lbO4fkpwjUvsjBhp",
+                        },
+                        {
+                            urls: "turn:global.relay.metered.ca:443",
+                            username: "39da8a42505447326d3d41f8",
+                            credential: "lbO4fkpwjUvsjBhp",
+                        },
+                        {
+                            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                            username: "39da8a42505447326d3d41f8",
+                            credential: "lbO4fkpwjUvsjBhp",
+                        },
                     ]
                 }
             })
