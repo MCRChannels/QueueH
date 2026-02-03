@@ -94,6 +94,7 @@ export default function Consult() {
 
                     call.on('stream', (remoteStream) => {
                         console.log('Received remote stream (Incoming Call)')
+                        window.lastCallStarted = Date.now()
                         setCallStatus('connected')
                         setRemoteStream(remoteStream)
                         setIsRemoteAudioOnly(remoteStream.getVideoTracks().length === 0)
@@ -101,7 +102,7 @@ export default function Consult() {
 
                     call.on('close', () => {
                         console.log('Call closed by remote')
-                        endCall()
+                        endCall(false) // Not intentional from this side
                     })
 
                     call.on('error', (e) => {
@@ -117,6 +118,14 @@ export default function Consult() {
                     setCallStatus('idle')
                 }
             })
+
+            peer.on('disconnected', () => {
+                console.warn('Peer disconnected. Attempting reconnect...')
+                if (peerRef.current && !peerRef.current.destroyed) {
+                    peerRef.current.reconnect()
+                }
+            })
+
         }
 
         return () => {
@@ -408,12 +417,13 @@ export default function Consult() {
 
             call.on('stream', (remoteStream) => {
                 console.log('Received remote stream (Outgoing Call)')
+                window.lastCallStarted = Date.now()
                 setCallStatus('connected')
                 setRemoteStream(remoteStream)
                 setIsRemoteAudioOnly(remoteStream.getVideoTracks().length === 0)
             })
 
-            call.on('close', () => endCall())
+            call.on('close', () => endCall(false))
 
             await supabase.from('consultations').update({
                 status: 'in_progress',
@@ -454,13 +464,23 @@ export default function Consult() {
         }
     }
 
-    const endCall = async () => {
+    const endCall = async (isIntentional = true) => {
+        const callDuration = (Date.now() - (window.lastCallStarted || Date.now())) / 1000
+
         if (callRef.current) callRef.current.close()
         if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop())
 
         callRef.current = null
         localStreamRef.current = null
         setRemoteStream(null)
+
+        // logic: If call was super short (< 5s) and NOT intentional (e.g. error/drop), 
+        // don't go to summary. Just go back to idle/waiting to let them retry.
+        if (!isIntentional && callDuration < 5) {
+            console.warn('Call dropped prematurely. Resetting to waiting/idle.')
+            setCallStatus('idle') // Or 'waiting' if we want to auto-rejoin?
+            return
+        }
 
         setCallStatus('summary')
 
