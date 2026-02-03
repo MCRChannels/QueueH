@@ -496,11 +496,12 @@ export default function Consult() {
     // 1. VIDEO ROOM UI
     if (callStatus === 'connected' || callStatus === 'connecting') {
         const isDoctor = profile.role === 'doctor_online' || profile.role === 'admin'
+        const [showMedicalPanel, setShowMedicalPanel] = useState(window.innerWidth > 768)
 
         return (
-            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0f172a', zIndex: 9999, display: 'flex' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0f172a', zIndex: 9999, display: 'flex', flexDirection: window.innerWidth <= 768 ? 'column' : 'row' }}>
                 {/* Main Content Area */}
-                <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', height: window.innerWidth <= 768 && showMedicalPanel ? '50%' : '100%' }}>
 
                     {/* Remote Video Container */}
                     <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -511,90 +512,87 @@ export default function Consult() {
                             </div>
                         )}
 
-                        {isRemoteAudioOnly && (
-                            <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: '#1e293b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                                <div style={{ width: '120px', height: '120px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Video size={64} style={{ opacity: 0.2 }} />
-                                </div>
-                                <h3 style={{ fontSize: '1.5rem', fontWeight: '700' }}>{language === 'en' ? 'Audio Only' : 'ปิดกล้อง'}</h3>
-                                <p className="text-muted">{language === 'en' ? 'User camera is off or unavailable' : 'กล้องของผู้ใช้งานปิดอยู่หรือไม่พร้อมใช้งาน'}</p>
-                            </div>
-                        )}
-
                         <video
                             ref={remoteVideoRef}
                             autoPlay
                             playsInline
-                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: isRemoteAudioOnly ? 'none' : 'block' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         />
 
                         {/* Self View (Pip) */}
                         <div style={{
                             position: 'absolute', top: '1.5rem', right: '1.5rem',
-                            width: '240px', height: '180px',
+                            width: window.innerWidth <= 768 ? '120px' : '240px',
+                            height: window.innerWidth <= 768 ? '90px' : '180px',
                             borderRadius: '1.25rem', border: '2px solid rgba(255,255,255,0.2)',
                             overflow: 'hidden', background: '#334155',
                             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
                             zIndex: 20
                         }}>
-                            {isLocalAudioOnly ? (
-                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'white', fontSize: '0.8rem' }}>
-                                    <Video size={32} style={{ opacity: 0.2, marginBottom: '0.5rem' }} />
-                                    <span>No Local Video</span>
-                                </div>
-                            ) : (
-                                <video ref={myVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                            )}
-                            {!isVideoEnabled && !isLocalAudioOnly && (
-                                <div style={{ position: 'absolute', inset: 0, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                                    {language === 'en' ? 'Video Paused' : 'หยุดวิดีโอ'}
-                                </div>
-                            )}
+                            <video ref={myVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                         </div>
                     </div>
 
                     {/* Integrated Controls Bar */}
-                    <div style={{ padding: '2rem', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1.5rem', zIndex: 30 }}>
-                        <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
-                        </button>
-                        <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isVideoEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
-                        </button>
-                        <button onClick={endCall} style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <PhoneOff size={24} />
-                        </button>
+                    <div style={{ padding: '2rem', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 30, pointerEvents: 'none' }}>
+                        <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1rem' }}>
+                            <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+                            </button>
+                            <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isVideoEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
+                            </button>
+                            <button onClick={endCall} style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <PhoneOff size={24} />
+                            </button>
+                            {isDoctor && (
+                                <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{ width: '60px', height: '60px', borderRadius: '50%', background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.2)', border: 'none', color: showMedicalPanel ? 'var(--primary)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Stethoscope size={24} />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* Doctor Sidebar - Professional Medical Notes */}
-                {isDoctor && (
-                    <div className="animate-fade-in" style={{ width: '400px', background: 'white', padding: '2rem', display: 'flex', flexDirection: 'column', overflowY: 'auto', borderLeft: '1px solid var(--border-color)' }}>
-                        <div style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>{t.consult.writeSummary}</h3>
-                            <p className="text-muted" style={{ fontSize: '0.875rem' }}>{language === 'en' ? 'These notes will be shared with the patient.' : 'บันทึกนี้จะถูกส่งไปให้ผู้ป่วยดู'}</p>
+                {isDoctor && showMedicalPanel && (
+                    <div className="animate-fade-in" style={{
+                        width: window.innerWidth <= 768 ? '100%' : '400px',
+                        height: window.innerWidth <= 768 ? '50%' : '100%',
+                        background: 'white',
+                        padding: '1.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflowY: 'auto',
+                        borderLeft: window.innerWidth > 768 ? '1px solid var(--border-color)' : 'none',
+                        borderTop: window.innerWidth <= 768 ? '1px solid var(--border-color)' : 'none',
+                        zIndex: 40
+                    }}>
+                        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>{t.consult.writeSummary}</h3>
+                            {window.innerWidth <= 768 && <button onClick={() => setShowMedicalPanel(false)} style={{ background: 'none', border: 'none' }}><XCircle color="var(--text-muted)" /></button>}
                         </div>
 
                         <textarea
                             className="input"
-                            rows={6}
+                            rows={4}
                             placeholder="Symptoms, Diagnosis, and Treatment Plan..."
                             value={summaryText}
                             onChange={e => setSummaryText(e.target.value)}
-                            style={{ margin: '0 0 2rem 0', borderRadius: '1rem', padding: '1.25rem' }}
+                            style={{ margin: '0 0 1.5rem 0', borderRadius: '1rem', padding: '1rem' }}
                         />
 
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1.25rem' }}>Prescribe Medications</h3>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Prescribe Medications</h3>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
                             {medicines.map((m, i) => (
-                                <div key={i} className="glass-card" style={{ padding: '1.25rem', border: '1px solid var(--border-color)' }}>
-                                    <input className="input" placeholder="Medication Name" value={m.name} onChange={e => updateMed(i, 'name', e.target.value)} style={{ marginBottom: '0.75rem' }} />
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                        <input className="input" placeholder="Quantity" value={m.quantity} onChange={e => updateMed(i, 'quantity', e.target.value)} />
-                                        <input className="input" type="number" placeholder="Price (฿)" value={m.price} onChange={e => updateMed(i, 'price', e.target.value)} />
+                                <div key={i} className="glass-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
+                                    <input className="input" placeholder="Medication Name" value={m.name} onChange={e => updateMed(i, 'name', e.target.value)} style={{ marginBottom: '0.5rem', fontSize: '0.9rem' }} />
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                        <input className="input" placeholder="Qty" value={m.quantity} onChange={e => updateMed(i, 'quantity', e.target.value)} style={{ fontSize: '0.9rem' }} />
+                                        <input className="input" type="number" placeholder="Price" value={m.price} onChange={e => updateMed(i, 'price', e.target.value)} style={{ fontSize: '0.9rem' }} />
                                     </div>
-                                    <button onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))} style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', background: 'none', padding: '0.5rem 0', cursor: 'pointer' }}>
-                                        <Trash2 size={12} style={{ marginRight: '4px' }} /> {language === 'en' ? 'Remove Item' : 'ลบรายการ'}
+                                    <button onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))} style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', background: 'none', padding: '0.5rem 0', cursor: 'pointer', marginTop: '0.25rem' }}>
+                                        <Trash2 size={12} style={{ marginRight: '4px' }} /> {language === 'en' ? 'Remove' : 'ลบ'}
                                     </button>
                                 </div>
                             ))}
@@ -603,20 +601,7 @@ export default function Consult() {
                             </button>
                         </div>
 
-                        <div style={{ marginTop: '2.5rem', background: 'var(--bg-color)', padding: '1.5rem', borderRadius: '1.25rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>
-                                <span>Subtotal</span>
-                                <span>{medicines.reduce((sum, m) => sum + (Number(m.price) || 0), 0)}฿</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', color: 'var(--text-muted)' }}>
-                                <span>Delivery Fee</span>
-                                <span>{deliveryFee}฿</span>
-                            </div>
-                            <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', marginBottom: '1rem' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '1.25rem', marginBottom: '1.5rem' }}>
-                                <span>{language === 'en' ? 'Total Estimate' : 'ยอดรวมประมาณการ'}</span>
-                                <span style={{ color: 'var(--primary)' }}>{medicines.reduce((sum, m) => sum + (Number(m.price) || 0), 0) + deliveryFee}฿</span>
-                            </div>
+                        <div style={{ marginTop: '1.5rem' }}>
                             <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={submitPrescription}>
                                 {t.consult.saveRecord}
                             </button>
