@@ -66,7 +66,18 @@ export default function Consult() {
             peerRef.current = peer
 
             peer.on('open', (id) => {
+                console.log('My Peer ID:', id)
                 setMyPeerId(id)
+            })
+
+            peer.on('error', (err) => {
+                console.error('PeerJS Error:', err)
+                // Don't alert on 'peer-unavailable' as it might be temporary
+                if (err.type === 'peer-unavailable') {
+                    // Retry logic or just ignore
+                } else {
+                    console.warn('Peer connection error:', err.type)
+                }
             })
 
             peer.on('call', async (call) => {
@@ -88,7 +99,16 @@ export default function Consult() {
                         setIsRemoteAudioOnly(remoteStream.getVideoTracks().length === 0)
                     })
 
-                    call.on('close', () => endCall())
+                    call.on('close', () => {
+                        console.log('Call closed by remote')
+                        endCall()
+                    })
+
+                    call.on('error', (e) => {
+                        console.error('Call error:', e)
+                        // Don't auto-end on minor errors
+                    })
+
                 } catch (err) {
                     console.error('Media Error', err)
                     let msg = language === 'en' ? 'Could not access Camera/Mic.' : 'ไม่สามารถเข้าถึงกล้องหรือไมโครโฟนได้'
@@ -97,7 +117,6 @@ export default function Consult() {
                     setCallStatus('idle')
                 }
             })
-
         }
 
         return () => {
