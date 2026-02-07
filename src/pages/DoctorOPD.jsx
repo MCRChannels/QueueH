@@ -245,12 +245,22 @@ export default function DoctorOPD() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', paddingLeft: '0.5rem' }}>
                             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--secondary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700' }}>
-                                {profile.first_name?.[0]}
+                                {(hospital?.active_doctor?.first_name || profile?.first_name)?.[0]}
                             </div>
                             <p className="text-muted" style={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                Dr. {profile.first_name} {profile.last_name}
-                                <span style={{ margin: '0 0.5rem', opacity: 0.3 }}>|</span>
-                                <span style={{ color: 'var(--primary)', fontWeight: '700' }}>{language === 'en' ? 'Attending Physician' : 'แพทย์ผู้รักษา'}</span>
+                                {hospital?.is_open && hospital?.active_doctor_id ? (
+                                    <>
+                                        Dr. {hospital.active_doctor?.first_name} {hospital.active_doctor?.last_name}
+                                        <span style={{ margin: '0 0.5rem', opacity: 0.3 }}>|</span>
+                                        <span style={{ color: 'var(--primary)', fontWeight: '700' }}>{language === 'en' ? 'Active Doctor' : 'แพทย์ที่กำลังเข้าเวร'}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        Dr. {profile.first_name} {profile.last_name}
+                                        <span style={{ margin: '0 0.5rem', opacity: 0.3 }}>|</span>
+                                        <span style={{ color: 'var(--text-muted)', fontWeight: '700' }}>{language === 'en' ? 'Off Duty' : 'ยังไม่เข้าเวร'}</span>
+                                    </>
+                                )}
                             </p>
                         </div>
                     </div>
@@ -267,23 +277,29 @@ export default function DoctorOPD() {
                         </div>
 
                         {/* Toggle Button */}
-                        <button
-                            onClick={toggleOpen}
-                            disabled={actionLoading}
-                            className={`btn ${hospital?.is_open ? 'btn-danger' : 'btn-success'}`}
-                            style={{
-                                padding: '0.75rem 1.75rem',
-                                borderRadius: '1rem',
-                                fontWeight: '700',
-                                boxShadow: hospital?.is_open ? '0 4px 15px rgba(239, 68, 68, 0.2)' : '0 4px 15px rgba(16, 185, 129, 0.2)'
-                            }}>
-                            {actionLoading ? <Loader2 className="spinner" size={20} /> : (
-                                <>
-                                    <Power size={20} />
-                                    {hospital?.is_open ? (language === 'en' ? 'Close Queue' : 'ปิดรับคิว') : (language === 'en' ? 'Open Queue' : 'เปิดรับคิว')}
-                                </>
-                            )}
-                        </button>
+                        {hospital?.is_open && hospital?.active_doctor_id && hospital?.active_doctor_id !== profile.id ? (
+                            <div className="badge badge-warning" style={{ padding: '0.75rem 1.25rem', borderRadius: '1rem', fontSize: '0.9rem' }}>
+                                {language === 'en' ? 'Managed by another doctor' : 'มีแพทย์ท่านอื่นดูแลอยู่'}
+                            </div>
+                        ) : (
+                            <button
+                                onClick={toggleOpen}
+                                disabled={actionLoading}
+                                className={`btn ${hospital?.is_open ? 'btn-danger' : 'btn-success'}`}
+                                style={{
+                                    padding: '0.75rem 1.75rem',
+                                    borderRadius: '1rem',
+                                    fontWeight: '700',
+                                    boxShadow: hospital?.is_open ? '0 4px 15px rgba(239, 68, 68, 0.2)' : '0 4px 15px rgba(16, 185, 129, 0.2)'
+                                }}>
+                                {actionLoading ? <Loader2 className="spinner" size={20} /> : (
+                                    <>
+                                        <Power size={20} />
+                                        {hospital?.is_open ? (language === 'en' ? 'Close Queue' : 'ปิดรับคิว') : (language === 'en' ? 'Open Queue' : 'เปิดรับคิว')}
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -316,7 +332,7 @@ export default function DoctorOPD() {
 
                         <button
                             onClick={callNext}
-                            disabled={queues.length === 0 || actionLoading}
+                            disabled={queues.length === 0 || actionLoading || (hospital?.is_open && hospital?.active_doctor_id && hospital?.active_doctor_id !== profile.id)}
                             className="btn btn-primary animate-fade-in"
                             style={{
                                 padding: '1.5rem',
@@ -326,7 +342,9 @@ export default function DoctorOPD() {
                                 borderRadius: '1.25rem',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '0.25rem'
+                                gap: '0.25rem',
+                                opacity: (hospital?.is_open && hospital?.active_doctor_id && hospital?.active_doctor_id !== profile.id) ? 0.5 : 1,
+                                cursor: (hospital?.is_open && hospital?.active_doctor_id && hospital?.active_doctor_id !== profile.id) ? 'not-allowed' : 'pointer'
                             }}>
                             {actionLoading ? <Loader2 className="spinner" size={24} /> : (
                                 <>
@@ -335,7 +353,10 @@ export default function DoctorOPD() {
                                         <span>{t.doctor.nextPatient}</span>
                                     </div>
                                     <span style={{ fontSize: '0.875rem', opacity: 0.8, fontWeight: '400' }}>
-                                        {queues.length > 0 ? (language === 'en' ? `Next: #${queues[0].queue_number}` : `คิวถัดไป: #${queues[0].queue_number}`) : (language === 'en' ? 'No more patients' : 'ไม่มีคิวที่รออยู่')}
+                                        {(hospital?.is_open && hospital?.active_doctor_id && hospital?.active_doctor_id !== profile.id)
+                                            ? (language === 'en' ? 'Access Denied' : 'ไม่มีสิทธิ์เรียกคิว')
+                                            : (queues.length > 0 ? (language === 'en' ? `Next: #${queues[0].queue_number}` : `คิวถัดไป: #${queues[0].queue_number}`) : (language === 'en' ? 'No more patients' : 'ไม่มีคิวที่รออยู่'))
+                                        }
                                     </span>
                                 </>
                             )}

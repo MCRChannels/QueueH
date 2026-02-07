@@ -13,47 +13,7 @@ export default function MyQueue() {
     const { language } = useLanguage()
     const t = translations[language]
 
-    // Notification Logic (copied from Home/Consult for consistency)
-    const lastNotifiedQueueDiff = useRef(null)
 
-    // Notification Sound
-    const playNotificationSound = () => {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)()
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
-            osc.connect(gain)
-            gain.connect(ctx.destination)
-            osc.type = 'sine'
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime)
-            osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1)
-            gain.gain.setValueAtTime(0.1, ctx.currentTime)
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
-            osc.start()
-            osc.stop(ctx.currentTime + 0.3)
-        } catch (e) {
-            console.error('Audio play failed', e)
-        }
-    }
-
-    const sendQueueNotification = (title, body) => {
-        if (!("Notification" in window)) return
-
-        if (Notification.permission === "granted") {
-            try {
-                new Notification(title, { body, icon: '/vite.svg' })
-                playNotificationSound()
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-            } catch (e) { console.error(e) }
-        } else if (Notification.permission !== "denied") {
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    new Notification(title, { body, icon: '/vite.svg' })
-                    playNotificationSound()
-                }
-            })
-        }
-    }
 
     useEffect(() => {
         fetchMyQueue()
@@ -93,19 +53,6 @@ export default function MyQueue() {
             const { data: hosp } = await supabase.from('hospitals').select('*').eq('id', queue.hospital_id).single()
             setHospital(hosp)
 
-            // Calculate diff for notification
-            if (hosp) {
-                const diff = queue.queue_number - (hosp.current_queue || 0)
-                if (diff > 0 && diff !== lastNotifiedQueueDiff.current) {
-                    if (diff <= 5 && diff % 2 !== 0) { // Notify at 5, 3, 1
-                        sendQueueNotification(
-                            language === 'en' ? 'Queue Update' : 'อัปเดตสถานะคิว',
-                            language === 'en' ? `${diff} people ahead of you.` : `เหลืออีก ${diff} คิวจะถึงตาคุณ`
-                        )
-                    }
-                    lastNotifiedQueueDiff.current = diff
-                }
-            }
         } else {
             setActiveQueue(null)
             setHospital(null)

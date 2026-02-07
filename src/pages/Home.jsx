@@ -21,51 +21,35 @@ export default function Home() {
     const [cancelReason, setCancelReason] = useState('')
     const [otherReason, setOtherReason] = useState('')
     const [cancelling, setCancelling] = useState(false)
+    const [currentTime, setCurrentTime] = useState(new Date())
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [])
+
+    const formatTime = (date) => {
+        return date.toLocaleTimeString(language === 'en' ? 'en-US' : 'th-TH', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        })
+    }
+
+    const formatDate = (date) => {
+        return date.toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+    }
 
     // Derived state for modal (always fresh)
     const selectedHospital = hospitals.find(h => h.id === selectedHospitalIdForModal) || null
 
-    // Notification State
-    const lastNotifiedQueueDiff = React.useRef(null)
 
-    // Notification Sound
-    const playNotificationSound = () => {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)()
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
-            osc.connect(gain)
-            gain.connect(ctx.destination)
-            osc.type = 'sine'
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime)
-            osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1)
-            gain.gain.setValueAtTime(0.1, ctx.currentTime)
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
-            osc.start()
-            osc.stop(ctx.currentTime + 0.3)
-        } catch (e) {
-            console.error('Audio play failed', e)
-        }
-    }
-
-    const sendQueueNotification = (title, body) => {
-        if (!("Notification" in window)) return
-
-        if (Notification.permission === "granted") {
-            try {
-                new Notification(title, { body, icon: '/vite.svg' })
-                playNotificationSound()
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-            } catch (e) { console.error(e) }
-        } else if (Notification.permission !== "denied") {
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    new Notification(title, { body, icon: '/vite.svg' })
-                    playNotificationSound()
-                }
-            })
-        }
-    }
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -105,45 +89,6 @@ export default function Home() {
         }
     }, [])
 
-    // -- QUEUE NOTIFICATION LOGIC (OPD) --
-    useEffect(() => {
-        if (!activeQueueId || !activeHospitalId || hospitals.length === 0) return
-
-        // 1. Find my queue number
-        const checkMyStatus = async () => {
-            const { data: myQueue } = await supabase.from('queues').select('queue_number').eq('id', activeQueueId).single()
-            const hospital = hospitals.find(h => h.id === activeHospitalId)
-
-            if (myQueue && hospital) {
-                const currentServing = hospital.current_queue || 0
-                const myNumber = myQueue.queue_number
-                const diff = myNumber - currentServing // How many people ahead
-
-                // Logic: Notify if queues remaining are specific thresholds
-                if (diff > 0 && diff !== lastNotifiedQueueDiff.current) {
-                    if (diff === 1) {
-                        sendQueueNotification(
-                            language === 'en' ? 'You are Next!' : 'ถึงคิวของคุณแล้ว!',
-                            language === 'en' ? `Please proceed to ${hospital.name}` : `กรุณาไปที่ ${hospital.name}`
-                        )
-                    } else if (diff === 3) {
-                        sendQueueNotification(
-                            language === 'en' ? '3 Queues Remaining' : 'อีก 3 คิวจะถึงตาคุณ',
-                            language === 'en' ? `Get ready at ${hospital.name}` : `เตรียมตัวรอเรียกที่ ${hospital.name}`
-                        )
-                    } else if (diff === 5) {
-                        sendQueueNotification(
-                            language === 'en' ? '5 Queues Remaining' : 'อีก 5 คิวจะถึงตาคุณ',
-                            language === 'en' ? `Prepare yourself.` : `เตรียมตัวให้พร้อม`
-                        )
-                    }
-                    lastNotifiedQueueDiff.current = diff
-                }
-            }
-        }
-
-        checkMyStatus()
-    }, [hospitals, activeQueueId, activeHospitalId])
 
     const fetchProfile = async (userId) => {
         const { data } = await supabase.from('profiles').select('credibility_score').eq('id', userId).single()
@@ -313,37 +258,74 @@ export default function Home() {
         <div style={{ background: 'var(--bg-color)', minHeight: '100vh', paddingBottom: '5rem' }}>
             {/* Hero Section */}
             <div style={{
-                background: 'linear-gradient(135deg, var(--primary) 0%, #818cf8 100%)',
+                background: '#7a70ffff',
                 color: 'white',
-                padding: '4rem 0',
-                marginBottom: '3rem',
+                padding: '6rem 0',
+                marginBottom: '4rem',
                 position: 'relative',
                 overflow: 'hidden'
             }}>
-                <div style={{
-                    position: 'absolute',
-                    top: '-10%',
-                    right: '-5%',
-                    width: '300px',
-                    height: '300px',
-                    background: 'rgba(255,255,255,0.1)',
-                    borderRadius: '50%',
-                    filter: 'blur(60px)'
-                }} />
-                <div className="container">
-                    <div className="animate-fade-in" style={{ maxWidth: '600px' }}>
-                        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: '800', marginBottom: '1rem', letterSpacing: '-0.02em', lineHeight: '1.1' }}>
-                            {t.home.heroTitle}
-                        </h1>
-                        <p style={{ fontSize: '1.25rem', opacity: 0.9, marginBottom: '2rem' }}>
-                            {t.home.heroSubtitle}
-                        </p>
-                        {session && credibilityScore < 50 && (
-                            <div className="glass" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', borderRadius: '1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                                <AlertCircle size={20} />
-                                <span style={{ fontWeight: '600' }}>{language === 'en' ? `Credibility Score Alert: ${credibilityScore}% (Booking Disabled)` : `คะแนนความน่าเชื่อถือ: ${credibilityScore}% (ไม่สามารถจองได้)`}</span>
+                <div className="container" style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '4rem', alignItems: 'center' }}>
+                        <div className="animate-fade-in">
+                            <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: '900', marginBottom: '1.5rem', letterSpacing: '-0.04em', lineHeight: '1' }}>
+                                {t.home.heroTitle}
+                            </h1>
+                            <p style={{ fontSize: '1.25rem', opacity: 0.9, marginBottom: '2.5rem', maxWidth: '520px', fontWeight: '400', lineHeight: '1.7' }}>
+                                {t.home.heroSubtitle}
+                            </p>
+                            {session && credibilityScore < 50 && (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.5rem', borderRadius: '1.25rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(255, 255, 255, 0.2)', color: 'white' }}>
+                                    <AlertCircle size={20} />
+                                    <span style={{ fontWeight: '600' }}>{language === 'en' ? `Credibility Score: ${credibilityScore}%` : `คะแนนความน่าเชื่อถือ: ${credibilityScore}%`}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Minimalist Clock Display */}
+                        <div className="animate-fade-in" style={{ animationDelay: '0.2s', display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    fontSize: '0.875rem',
+                                    fontWeight: '700',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.3em',
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    {formatDate(currentTime)}
+                                </div>
+                                <div style={{
+                                    fontSize: '7.5rem',
+                                    fontWeight: '200',
+                                    lineHeight: '1',
+                                    color: 'white',
+                                    letterSpacing: '-5px',
+                                    marginBottom: '1rem',
+                                    display: 'flex',
+                                    alignItems: 'baseline',
+                                    justifyContent: 'center'
+                                }}>
+                                    {currentTime.toLocaleTimeString(language === 'en' ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                    <span style={{ fontSize: '3rem', fontWeight: '400', opacity: 0.3, letterSpacing: '0', marginLeft: '0.75rem' }}>
+                                        {currentTime.getSeconds().toString().padStart(2, '0')}
+                                    </span>
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.75rem',
+                                    color: 'rgba(255, 255, 255, 0.6)'
+                                }}>
+                                    <div style={{ width: '30px', height: '1px', background: 'rgba(255, 255, 255, 0.2)' }}></div>
+                                    <span style={{ fontSize: '0.8125rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                        {language === 'en' ? 'Bangkok, Thailand' : 'กรุงเทพมหานคร'}
+                                    </span>
+                                    <div style={{ width: '30px', height: '1px', background: 'rgba(255, 255, 255, 0.2)' }}></div>
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>

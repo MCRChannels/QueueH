@@ -55,8 +55,6 @@ export default function Navbar({ session }) {
         allLinks.push({ to: '/consult', label: t.consult, icon: <Stethoscope size={20} /> })
     }
 
-    allLinks.push({ to: '/profile', label: t.profile, icon: <User size={20} /> })
-
     if (role === 'patient') {
         allLinks.push({ to: '/my-queue', label: 'MyQ', icon: <Clock size={20} /> })
     }
@@ -119,6 +117,26 @@ export default function Navbar({ session }) {
                             {link.label}
                         </Link>
                     ))}
+                    {/* Profile Link - now grouped with settings */}
+                    <Link
+                        to="/profile"
+                        className={`nav-link ${location.pathname === '/profile' ? 'active' : ''}`}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.6rem 1rem',
+                            borderRadius: '0.75rem',
+                            fontSize: '0.95rem',
+                            fontWeight: '500',
+                            color: location.pathname === '/profile' ? 'var(--primary)' : 'var(--text-main)',
+                            background: location.pathname === '/profile' ? 'var(--primary-light)' : 'transparent',
+                        }}
+                    >
+                        <User size={20} />
+                        {t.profile}
+                    </Link>
+
                     {/* Language Toggle */}
                     <button
                         onClick={toggleLanguage}
@@ -134,7 +152,6 @@ export default function Navbar({ session }) {
                             fontSize: '0.85rem',
                             fontWeight: '700',
                             color: 'var(--text-main)',
-                            marginLeft: '0.5rem'
                         }}
                     >
                         <Globe size={16} />
@@ -216,6 +233,25 @@ export default function Navbar({ session }) {
                             {link.label}
                         </Link>
                     ))}
+                    {/* Add Profile to mobile menu explicitly as well */}
+                    <Link
+                        to="/profile"
+                        onClick={() => setIsMenuOpen(false)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.8rem',
+                            padding: '1rem',
+                            borderRadius: '0.75rem',
+                            fontSize: '1rem',
+                            fontWeight: '500',
+                            background: location.pathname === '/profile' ? 'var(--primary-light)' : 'transparent',
+                            color: location.pathname === '/profile' ? 'var(--primary)' : 'var(--text-main)'
+                        }}
+                    >
+                        <User size={20} />
+                        {t.profile}
+                    </Link>
                     {/* Mobile Language Toggle */}
                     <button
                         onClick={toggleLanguage}

@@ -12,6 +12,7 @@ import DoctorOPD from './pages/DoctorOPD'
 import MyQueue from './pages/MyQueue'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import NotificationManager from './components/NotificationManager'
 import { supabase } from './lib/supabase'
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
           <Route path="*" element={
             <>
               <Navbar session={session} />
+              <NotificationManager session={session} />
               <div style={{ padding: '2rem 0' }}>
                 <Routes>
                   <Route path="/" element={<Home />} />

@@ -32,9 +32,23 @@ export default function Profile() {
 
     const fetchData = async (userId) => {
         try {
-            const { data: profileData } = await supabase.from('profiles').select('*, hospitals(name)').eq('id', userId).single()
-            const { data: queueData } = await supabase.from('queues').select('*, hospitals(name)').eq('user_id', userId).order('created_at', { ascending: false })
+            // Fetch profile - simple select to ensure it works even without foreign keys
+            const { data: profileData, error: pError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .maybeSingle()
 
+            if (pError) console.error('Profile fetch error:', pError)
+
+            // Queue data
+            const { data: queueData } = await supabase
+                .from('queues')
+                .select('*, hospitals(name)')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+
+            // Consult data
             const { data: consultData } = await supabase
                 .from('consultations')
                 .select(`
@@ -50,25 +64,40 @@ export default function Profile() {
             setQueues(queueData || [])
             setConsults(consultData || [])
         } catch (err) {
-            console.error(err)
+            console.error('General fetch error:', err)
         } finally {
             setLoading(false)
         }
     }
 
     const handleEditClick = () => {
-        setEditForm({
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            phone: profile.phone || '',
-            house_no: profile.house_no || '',
-            village: profile.village || '',
-            road: profile.road || '',
-            sub_district: profile.sub_district || '',
-            district: profile.district || '',
-            province: profile.province || '',
-            zipcode: profile.zipcode || ''
-        })
+        if (!profile) {
+            setEditForm({
+                first_name: '',
+                last_name: '',
+                phone: '',
+                house_no: '',
+                village: '',
+                road: '',
+                sub_district: '',
+                district: '',
+                province: '',
+                zipcode: ''
+            })
+        } else {
+            setEditForm({
+                first_name: profile.first_name || '',
+                last_name: profile.last_name || '',
+                phone: profile.phone || '',
+                house_no: profile.house_no || '',
+                village: profile.village || '',
+                road: profile.road || '',
+                sub_district: profile.sub_district || '',
+                district: profile.district || '',
+                province: profile.province || '',
+                zipcode: profile.zipcode || ''
+            })
+        }
         setIsEditing(true)
     }
 
@@ -85,15 +114,35 @@ export default function Profile() {
     const handleSaveClick = async () => {
         setSaveLoading(true)
         try {
-            const { error } = await supabase.from('profiles').update(editForm).eq('id', session.user.id)
+            // Check if profile exists
+            const { data: existing } = await supabase.from('profiles').select('id').eq('id', session.user.id).maybeSingle()
+
+            let error
+            if (!existing) {
+                // If somehow profile record is missing, create it
+                const { error: insError } = await supabase.from('profiles').insert({
+                    id: session.user.id,
+                    email: session.user.email,
+                    ...editForm,
+                    role: 'patient',
+                    credibility_score: 100
+                })
+                error = insError
+            } else {
+                // Update existing
+                const { error: updError } = await supabase.from('profiles').update(editForm).eq('id', session.user.id)
+                error = updError
+            }
+
             if (error) throw error
 
-            setProfile({ ...profile, ...editForm })
+            setProfile(prev => ({ ...(prev || {}), ...editForm }))
             setIsEditing(false)
             alert(language === 'en' ? 'Profile Updated Successfully' : 'อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว')
+            fetchData(session.user.id) // Reload to get everything synced
         } catch (err) {
-            console.error(err)
-            alert('Error updating profile')
+            console.error('Save error:', err)
+            alert('Error updating profile: ' + err.message)
         } finally {
             setSaveLoading(false)
         }
@@ -116,8 +165,12 @@ export default function Profile() {
         </div>
     )
 
-    const userProfile = profile || { first_name: 'Patient', last_name: '', credibility_score: 100 }
-    const score = userProfile.credibility_score
+    const userProfile = profile || {
+        first_name: session?.user?.email?.split('@')[0] || (language === 'en' ? 'User' : 'ผู้ใช้งาน'),
+        last_name: '',
+        credibility_score: 100
+    }
+    const score = userProfile.credibility_score || 100
     const isBanned = score < 50
 
     return (
@@ -136,7 +189,7 @@ export default function Profile() {
                             color: 'white', fontSize: '2.5rem', fontWeight: '800',
                             boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)'
                         }}>
-                            {userProfile.first_name?.[0].toUpperCase() || 'U'}
+                            {(userProfile.first_name?.[0] || 'U').toUpperCase()}
                         </div>
                         <div style={{ position: 'absolute', bottom: '-5px', right: '-5px', background: 'white', padding: '4px', borderRadius: '50%' }}>
                             <div style={{ background: '#10b981', width: '15px', height: '15px', borderRadius: '50%', border: '3px solid white' }}></div>
@@ -146,7 +199,9 @@ export default function Profile() {
                     <div style={{ flex: 1, minWidth: '250px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1.5rem', position: 'relative' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.25rem)', fontWeight: '800', margin: 0, lineHeight: 1.1 }}>{userProfile.first_name} {userProfile.last_name}</h1>
+                                <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.25rem)', fontWeight: '800', margin: 0, lineHeight: 1.1 }}>
+                                    {userProfile.first_name || (language === 'en' ? 'User' : 'ผู้ใช้งาน')} {userProfile.last_name || ''}
+                                </h1>
                                 <button onClick={handleEditClick} className="btn-icon" style={{ borderRadius: '50%', padding: '0.6rem', background: 'var(--bg-color)', flexShrink: 0 }}>
                                     <Edit2 size={20} />
                                 </button>
@@ -358,28 +413,29 @@ export default function Profile() {
             </div>
 
             {/* Address & Logistics Details */}
-            {userProfile.house_no && (
-                <div className="glass-card animate-fade-in" style={{ marginTop: '3rem', animationDelay: '0.4s', padding: '2rem' }}>
-                    <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1, minWidth: '300px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                                <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.75rem' }}><MapPin size={20} /></div>
-                                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '800' }}>{t.profile.deliveryAddress}</h3>
+            <div className="glass-card animate-fade-in" style={{ marginTop: '3rem', animationDelay: '0.4s', padding: '2rem' }}>
+                <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: '300px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                            <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.75rem' }}><MapPin size={20} /></div>
+                            <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '800' }}>{t.profile.deliveryAddress}</h3>
+                        </div>
+                        <div style={{ padding: '1.5rem', background: 'var(--bg-color)', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.5rem' }}>
+                                {userProfile.first_name || ''} {userProfile.last_name || ''}
                             </div>
-                            <div style={{ padding: '1.5rem', background: 'var(--bg-color)', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.5rem' }}>{userProfile.first_name} {userProfile.last_name}</div>
-                                <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
-                                    {userProfile.house_no} {userProfile.village ? (language === 'en' ? `Moo ${userProfile.village}` : `หมู่ ${userProfile.village}`) : ''} {userProfile.road},<br />
-                                    {userProfile.sub_district}, {userProfile.district},<br />
-                                    {userProfile.province} {userProfile.zipcode}
-                                </p>
-                                {userProfile.phone && <div style={{ marginTop: '0.5rem', fontWeight: '600', color: 'var(--primary)' }}>Tel: {userProfile.phone}</div>}
+                            <p style={{ color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: '1.6', margin: 0 }}>
+                                {userProfile.house_no || '-'} {userProfile.village ? (language === 'en' ? `Moo ${userProfile.village}` : `หมู่ ${userProfile.village}`) : ''} {userProfile.road ? (language === 'en' ? `, ${userProfile.road}` : `, ถนน${userProfile.road}`) : ''}<br />
+                                {userProfile.sub_district || '-'}, {userProfile.district || '-'},<br />
+                                {userProfile.province || '-'} {userProfile.zipcode || ''}
+                            </p>
+                            <div style={{ marginTop: '0.5rem', fontWeight: '600', color: 'var(--primary)' }}>
+                                Tel: {userProfile.phone || '-'}
                             </div>
                         </div>
-
                     </div>
                 </div>
-            )}
+            </div>
 
             {/* Edit Profile Modal */}
             {isEditing && (
@@ -395,16 +451,16 @@ export default function Profile() {
                             <div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>First Name</label>
-                                        <input className="input" name="first_name" value={editForm.first_name} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>{t.auth.firstName}</label>
+                                        <input className="input" name="first_name" value={editForm.first_name || ''} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
                                     </div>
                                     <div>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>Last Name</label>
-                                        <input className="input" name="last_name" value={editForm.last_name} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>{t.auth.lastName}</label>
+                                        <input className="input" name="last_name" value={editForm.last_name || ''} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
                                     </div>
                                     <div style={{ gridColumn: 'span 2' }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>Phone</label>
-                                        <input className="input" name="phone" value={editForm.phone} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>{t.auth.phone}</label>
+                                        <input className="input" name="phone" value={editForm.phone || ''} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
                                     </div>
                                 </div>
                             </div>
