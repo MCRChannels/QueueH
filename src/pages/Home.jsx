@@ -256,73 +256,93 @@ export default function Home() {
 
     return (
         <div style={{ background: 'var(--bg-color)', minHeight: '100vh', paddingBottom: '5rem' }}>
-            {/* Hero Section */}
+            {/* Compact Premium Hero Section */}
             <div style={{
                 background: '#7a70ffff',
                 color: 'white',
-                padding: '6rem 0',
-                marginBottom: '4rem',
+                padding: 'clamp(2rem, 8vh, 5rem) 0', // Responsive padding
+                marginBottom: 'clamp(1.5rem, 5vw, 3rem)',
                 position: 'relative',
                 overflow: 'hidden'
             }}>
+                {/* Decorative Background Elements */}
+                <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '40%', height: '120%', background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)', borderRadius: '50%', filter: 'blur(60px)' }}></div>
+
                 <div className="container" style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '4rem', alignItems: 'center' }}>
-                        <div className="animate-fade-in">
-                            <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 4rem)', fontWeight: '900', marginBottom: '1.5rem', letterSpacing: '-0.04em', lineHeight: '1' }}>
+                    <div className="hero-grid" style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                        gap: 'clamp(1.5rem, 5vw, 4rem)',
+                        alignItems: 'center'
+                    }}>
+                        <div className="animate-fade-in" style={{ textAlign: 'left' }}>
+                            <h1 style={{
+                                fontSize: 'clamp(1.75rem, 5vw, 3.8rem)', // Smaller on mobile
+                                fontWeight: '900',
+                                marginBottom: '0.75rem',
+                                letterSpacing: '-0.04em',
+                                lineHeight: '1.05'
+                            }}>
                                 {t.home.heroTitle}
                             </h1>
-                            <p style={{ fontSize: '1.25rem', opacity: 0.9, marginBottom: '2.5rem', maxWidth: '520px', fontWeight: '400', lineHeight: '1.7' }}>
+                            <p style={{
+                                fontSize: 'clamp(0.95rem, 2vw, 1.25rem)',
+                                opacity: 0.8,
+                                marginBottom: '1.5rem',
+                                maxWidth: '480px',
+                                fontWeight: '400',
+                                lineHeight: '1.5'
+                            }}>
                                 {t.home.heroSubtitle}
                             </p>
+
                             {session && credibilityScore < 50 && (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.5rem', borderRadius: '1.25rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(255, 255, 255, 0.2)', color: 'white' }}>
-                                    <AlertCircle size={20} />
-                                    <span style={{ fontWeight: '600' }}>{language === 'en' ? `Credibility Score: ${credibilityScore}%` : `คะแนนความน่าเชื่อถือ: ${credibilityScore}%`}</span>
+                                <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.6rem 1.2rem',
+                                    borderRadius: '1rem',
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                    backdropFilter: 'blur(8px)',
+                                    fontSize: '0.8rem'
+                                }}>
+                                    <AlertCircle size={16} />
+                                    <span style={{ fontWeight: '700' }}>{language === 'en' ? `Low Credibility: ${credibilityScore}%` : `คะแนนความน่าเชื่อถือต่ำ: ${credibilityScore}%`}</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* Minimalist Clock Display */}
+                        {/* Streamlined Dashboard Clock */}
                         <div className="animate-fade-in" style={{ animationDelay: '0.2s', display: 'flex', justifyContent: 'center' }}>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{
-                                    fontSize: '0.875rem',
-                                    fontWeight: '700',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '800',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.3em',
-                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    color: 'rgba(255, 255, 255, 0.5)',
                                     marginBottom: '0.5rem'
                                 }}>
                                     {formatDate(currentTime)}
                                 </div>
                                 <div style={{
-                                    fontSize: '7.5rem',
+                                    fontSize: 'clamp(4rem, 15vw, 8rem)', // More aggressive shrink
                                     fontWeight: '200',
                                     lineHeight: '1',
                                     color: 'white',
-                                    letterSpacing: '-5px',
-                                    marginBottom: '1rem',
+                                    letterSpacing: '-4px',
+                                    marginBottom: '0.75rem',
                                     display: 'flex',
                                     alignItems: 'baseline',
                                     justifyContent: 'center'
                                 }}>
-                                    {currentTime.toLocaleTimeString(language === 'en' ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                    <span style={{ fontSize: '3rem', fontWeight: '400', opacity: 0.3, letterSpacing: '0', marginLeft: '0.75rem' }}>
+                                    {currentTime.getHours().toString().padStart(2, '0')}:{currentTime.getMinutes().toString().padStart(2, '0')}
+                                    <span style={{ fontSize: '0.35em', fontWeight: '400', opacity: 0.25, letterSpacing: '0', marginLeft: '0.4rem' }}>
                                         {currentTime.getSeconds().toString().padStart(2, '0')}
                                     </span>
-                                </div>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.75rem',
-                                    color: 'rgba(255, 255, 255, 0.6)'
-                                }}>
-                                    <div style={{ width: '30px', height: '1px', background: 'rgba(255, 255, 255, 0.2)' }}></div>
-                                    <span style={{ fontSize: '0.8125rem', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                        {language === 'en' ? 'Bangkok, Thailand' : 'กรุงเทพมหานคร'}
-                                    </span>
-                                    <div style={{ width: '30px', height: '1px', background: 'rgba(255, 255, 255, 0.2)' }}></div>
                                 </div>
                             </div>
                         </div>
