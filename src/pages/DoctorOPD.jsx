@@ -156,7 +156,10 @@ export default function DoctorOPD() {
     const mockAddQueue = async () => {
         setActionLoading(true)
         try {
-            // Find a dummy user that isn't THIS doctor
+            // 1. Fetch the latest hospital data directly from source to avoid stale state
+            const { data: freshHosp } = await supabase.from('hospitals').select('total_queues').eq('id', hospital.id).single()
+
+            // 2. Find a dummy user
             const { data: users } = await supabase.from('profiles').select('id').neq('id', profile.id).limit(10)
             if (!users || users.length === 0) {
                 alert('No dummy users found to mock a booking.')
@@ -164,8 +167,9 @@ export default function DoctorOPD() {
             }
 
             const randomUser = users[Math.floor(Math.random() * users.length)]
-            const nextQueueNum = (hospital.total_queues || 0) + 1
+            const nextQueueNum = (freshHosp?.total_queues || 0) + 1
 
+            // 3. Insert new queue
             const { error } = await supabase.from('queues').insert({
                 user_id: randomUser.id,
                 hospital_id: hospital.id,
@@ -175,7 +179,7 @@ export default function DoctorOPD() {
 
             if (error) throw error
 
-            // Increment hospital total_queues
+            // 4. Update hospital total_queues
             await supabase.from('hospitals').update({ total_queues: nextQueueNum }).eq('id', hospital.id)
 
             await fetchHospitalData(hospital.id)

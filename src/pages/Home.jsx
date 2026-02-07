@@ -210,10 +210,13 @@ export default function Home() {
     const confirmBooking = async () => {
         setBookingLoading(true)
         try {
-            const { user } = session
-            const nextQueue = selectedHospital.total_queues + 1
+            // 1. Fetch fresh total_queues to avoid race conditions/stale state
+            const { data: freshHosp } = await supabase.from('hospitals').select('total_queues').eq('id', selectedHospital.id).single()
 
-            // 1. Insert into queues
+            const { user } = session
+            const nextQueue = (freshHosp?.total_queues || 0) + 1
+
+            // 2. Insert into queues
             const { error: qError } = await supabase.from('queues').insert({
                 user_id: user.id,
                 hospital_id: selectedHospital.id,
@@ -223,7 +226,7 @@ export default function Home() {
 
             if (qError) throw qError
 
-            // 2. Increment total_queues in hospitals table
+            // 3. Increment total_queues in hospitals table
             const { error: hError } = await supabase.from('hospitals')
                 .update({ total_queues: nextQueue })
                 .eq('id', selectedHospital.id)
