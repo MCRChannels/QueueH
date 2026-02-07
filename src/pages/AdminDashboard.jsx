@@ -99,27 +99,29 @@ export default function AdminDashboard() {
         <div className="container" style={{ padding: '3rem 1rem 6rem' }}>
 
             {/* Header Area */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3rem' }}>
-                <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '3rem' }}>
+                <div style={{ flex: '1 1 auto' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
                             <Shield size={24} />
                         </div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>{t.admin.title}</h1>
+                        <h1 style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: '800', margin: 0 }}>{t.admin.title}</h1>
                     </div>
-                    <p className="text-muted">{language === 'en' ? 'System Administration & Oversight' : 'ระบบจัดการและดูแลความเรียบร้อย'}</p>
+                    <p className="text-muted" style={{ margin: 0 }}>{language === 'en' ? 'System Administration & Oversight' : 'ระบบจัดการและดูแลความเรียบร้อย'}</p>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div className="glass" style={{ display: 'flex', padding: '0.35rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.7)' }}>
+                <div style={{ display: 'flex', gap: '1rem', width: 'auto' }}>
+                    <div className="glass" style={{ display: 'flex', padding: '0.35rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.7)', width: '100%' }}>
                         <button
                             onClick={() => setActiveTab('users')}
                             className={activeTab === 'users' ? 'btn btn-primary' : 'btn-outline'}
                             style={{
+                                flex: 1,
                                 padding: '0.6rem 1.25rem',
                                 border: 'none',
                                 borderRadius: '0.75rem',
                                 background: activeTab === 'users' ? undefined : 'transparent',
-                                boxShadow: activeTab === 'users' ? undefined : 'none'
+                                boxShadow: activeTab === 'users' ? undefined : 'none',
+                                whiteSpace: 'nowrap'
                             }}>
                             <Users size={18} />
                             {language === 'en' ? 'Users' : 'ผู้ใช้งาน'}
@@ -128,11 +130,13 @@ export default function AdminDashboard() {
                             onClick={() => setActiveTab('hospitals')}
                             className={activeTab === 'hospitals' ? 'btn btn-primary' : 'btn-outline'}
                             style={{
+                                flex: 1,
                                 padding: '0.6rem 1.25rem',
                                 border: 'none',
                                 borderRadius: '0.75rem',
                                 background: activeTab === 'hospitals' ? undefined : 'transparent',
-                                boxShadow: activeTab === 'hospitals' ? undefined : 'none'
+                                boxShadow: activeTab === 'hospitals' ? undefined : 'none',
+                                whiteSpace: 'nowrap'
                             }}>
                             <Building size={18} />
                             {language === 'en' ? 'Hospitals' : 'สถานพยาบาล'}
@@ -178,15 +182,15 @@ export default function AdminDashboard() {
 
             {activeTab === 'users' ? (
                 <div className="glass-card animate-fade-in" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
+                    <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: 'white' }}>
                         <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>{language === 'en' ? 'System Users' : 'ผู้ใช้งานระบบ'} ({users.length})</h3>
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'relative', flex: '1 1 200px' }}>
                             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input className="input" placeholder={language === 'en' ? "Search accounts..." : "ค้นหาบัญชี..."} style={{ paddingLeft: '2.75rem', width: '280px', height: '42px', borderRadius: '0.75rem' }} />
+                            <input className="input" placeholder={language === 'en' ? "Search accounts..." : "ค้นหาบัญชี..."} style={{ paddingLeft: '2.75rem', width: '100%', height: '42px', borderRadius: '0.75rem' }} />
                         </div>
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div className="mobile-table-wrapper">
+                        <table className="admin-table">
                             <thead>
                                 <tr style={{ background: 'var(--bg-color)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     <th style={{ textAlign: 'left', padding: '1rem 2rem' }}>{language === 'en' ? 'Identity' : 'ข้อมูล'}</th>
@@ -198,7 +202,7 @@ export default function AdminDashboard() {
                             <tbody>
                                 {users.map((u, idx) => (
                                     <tr key={u.id} className="table-row-hover" style={{ borderBottom: '1px solid var(--bg-color)' }}>
-                                        <td style={{ padding: '1.25rem 2rem' }}>
+                                        <td data-label={language === 'en' ? 'Identity' : 'ข้อมูล'} style={{ padding: '1.25rem 2rem' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <div style={{
                                                     width: '40px', height: '40px', borderRadius: '50%',
@@ -214,7 +218,7 @@ export default function AdminDashboard() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '1.25rem 1rem' }}>
+                                        <td data-label={language === 'en' ? 'Security Role' : 'บทบาท'} style={{ padding: '1.25rem 1rem' }}>
                                             <select
                                                 disabled={actionLoading}
                                                 value={u.role || 'patient'}
@@ -227,7 +231,7 @@ export default function AdminDashboard() {
                                                 <option value="admin">{language === 'en' ? 'Admin' : 'ผู้ดูแลระบบ'}</option>
                                             </select>
                                         </td>
-                                        <td style={{ padding: '1.25rem 1rem' }}>
+                                        <td data-label={language === 'en' ? 'Affiliation' : 'สังกัด'} style={{ padding: '1.25rem 1rem' }}>
                                             <select
                                                 disabled={actionLoading}
                                                 value={u.hospital_id || ''}
@@ -249,7 +253,7 @@ export default function AdminDashboard() {
             ) : (
                 <div className="animate-fade-in">
                     {/* Facility Control Center */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
+                    <div className="admin-hospitals-layout">
                         <div>
                             <div className="glass-card" style={{ padding: '2rem', sticky: 'top' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
@@ -325,6 +329,54 @@ export default function AdminDashboard() {
                 .table-row-hover:hover { background-color: #f8fafc; }
                 .spinner { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+                .admin-table { width: 100%; border-collapse: collapse; }
+                .admin-table th { white-space: nowrap; }
+                .admin-table td { transition: none; }
+
+                .admin-hospitals-layout {
+                    display: grid;
+                    grid-template-columns: minmax(300px, 1fr) 2fr;
+                    gap: 2rem;
+                }
+
+                @media (max-width: 992px) {
+                    .admin-hospitals-layout { grid-template-columns: 1fr; }
+                }
+
+                @media (max-width: 768px) {
+                    .admin-table thead { display: none; }
+                    .admin-table tr { 
+                        display: flex; 
+                        flex-direction: column; 
+                        padding: 1.5rem; 
+                        border-bottom: 8px solid var(--bg-color);
+                    }
+                    .admin-table td { 
+                        padding: 0.5rem 0 !important; 
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center; 
+                        border: none !important;
+                    }
+                    .admin-table td::before {
+                        content: attr(data-label);
+                        font-size: 0.75rem;
+                        font-weight: 700;
+                        color: var(--text-muted);
+                        text-transform: uppercase;
+                    }
+                    .admin-table td:last-child {
+                        justify-content: flex-end;
+                        margin-top: 0.5rem;
+                        border-top: 1px dashed var(--border-color) !important;
+                        padding-top: 1rem !important;
+                    }
+                    .admin-table select {
+                        max-width: 200px !important;
+                        width: auto;
+                    }
+                }
             `}</style>
         </div>
     )

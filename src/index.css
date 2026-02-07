@@ -229,3 +229,30 @@ button {
     padding: 0 1rem;
   }
 }
+
+/* Mobile Navbar - Fix */
+@media (max-width: 992px) {
+  .desktop-menu {
+    display: none !important;
+  }
+
+  .mobile-toggle {
+    display: block !important;
+  }
+
+  /* Added mobile menu flex layout here */
+  .mobile-menu {
+    display: flex !important;
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 993px) {
+  .mobile-toggle {
+    display: none !important;
+  }
+
+  .mobile-menu {
+    display: none !important;
+  }
+}

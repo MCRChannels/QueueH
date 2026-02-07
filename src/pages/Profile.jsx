@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { User, Calendar, AlertTriangle, Stethoscope, Clock, Truck, Package, Building, MapPin, ClipboardList, CreditCard, ChevronRight, CheckCircle2, History, ShieldCheck, Loader2 } from 'lucide-react'
+import { User, Calendar, AlertTriangle, Stethoscope, Clock, Truck, Package, Building, MapPin, ClipboardList, CreditCard, ChevronRight, CheckCircle2, History, ShieldCheck, Loader2, Edit2, Save, X } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 
@@ -13,6 +13,11 @@ export default function Profile() {
     const [loading, setLoading] = useState(true)
     const { language } = useLanguage()
     const t = translations[language]
+
+    // Edit State
+    const [isEditing, setIsEditing] = useState(false)
+    const [editForm, setEditForm] = useState({})
+    const [saveLoading, setSaveLoading] = useState(false)
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,6 +53,49 @@ export default function Profile() {
             console.error(err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleEditClick = () => {
+        setEditForm({
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            phone: profile.phone || '',
+            house_no: profile.house_no || '',
+            village: profile.village || '',
+            road: profile.road || '',
+            sub_district: profile.sub_district || '',
+            district: profile.district || '',
+            province: profile.province || '',
+            zipcode: profile.zipcode || ''
+        })
+        setIsEditing(true)
+    }
+
+    const handleCancelClick = () => {
+        setIsEditing(false)
+        setEditForm({})
+    }
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target
+        setEditForm(prev => ({ ...prev, [name]: value }))
+    }
+
+    const handleSaveClick = async () => {
+        setSaveLoading(true)
+        try {
+            const { error } = await supabase.from('profiles').update(editForm).eq('id', session.user.id)
+            if (error) throw error
+
+            setProfile({ ...profile, ...editForm })
+            setIsEditing(false)
+            alert(language === 'en' ? 'Profile Updated Successfully' : 'อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว')
+        } catch (err) {
+            console.error(err)
+            alert('Error updating profile')
+        } finally {
+            setSaveLoading(false)
         }
     }
 
@@ -96,10 +144,19 @@ export default function Profile() {
                     </div>
 
                     <div style={{ flex: 1, minWidth: '250px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                            <h1 style={{ fontSize: '2.25rem', fontWeight: '800', margin: 0 }}>{userProfile.first_name} {userProfile.last_name}</h1>
-                            <span className="badge badge-primary" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{userProfile.role || 'patient'}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1.5rem', position: 'relative' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.25rem)', fontWeight: '800', margin: 0, lineHeight: 1.1 }}>{userProfile.first_name} {userProfile.last_name}</h1>
+                                <button onClick={handleEditClick} className="btn-icon" style={{ borderRadius: '50%', padding: '0.6rem', background: 'var(--bg-color)', flexShrink: 0 }}>
+                                    <Edit2 size={20} />
+                                </button>
+                            </div>
+                            <div>
+                                <span className="badge badge-primary" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{userProfile.role || 'patient'}</span>
+                            </div>
                         </div>
+
+
                         <p className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                             <History size={16} /> {t.profile.memberSince} {new Date(profile?.created_at || Date.now()).toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH', { month: 'long', year: 'numeric' })}
                         </p>
@@ -256,10 +313,10 @@ export default function Profile() {
                             )
 
                             return (
-                                <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))' }}>
+                                <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
                                     {orders.map(order => (
                                         <div key={order.id} className="table-row-hover" style={{ border: '1px solid var(--border-color)', borderRadius: '1.5rem', padding: '1.75rem', background: 'white' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
                                                 <div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                                                         <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{t.profile.orderRef}</span>
@@ -316,27 +373,69 @@ export default function Profile() {
                                     {userProfile.sub_district}, {userProfile.district},<br />
                                     {userProfile.province} {userProfile.zipcode}
                                 </p>
+                                {userProfile.phone && <div style={{ marginTop: '0.5rem', fontWeight: '600', color: 'var(--primary)' }}>Tel: {userProfile.phone}</div>}
                             </div>
                         </div>
-                        <div style={{ width: '300px', padding: '1.5rem', background: 'rgba(59, 130, 246, 0.03)', borderRadius: '1.25rem', border: '1px dashed var(--primary)' }}>
-                            <h4 style={{ fontSize: '0.9rem', fontWeight: '800', marginBottom: '1rem' }}>{t.profile.accountSecurity}</h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                    <span className="text-muted">{t.profile.accountID}</span>
-                                    <span style={{ fontWeight: '700' }}>#{userProfile.id?.slice(0, 8)}</span>
+
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Profile Modal */}
+            {isEditing && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' }}>
+                    <div className="glass-card animate-fade-in" style={{ padding: '2rem', maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{language === 'en' ? 'Edit Profile' : 'แก้ไขข้อมูลส่วนตัว'}</h3>
+                            <button onClick={handleCancelClick} className="btn-icon"><X size={24} /></button>
+                        </div>
+
+                        <div style={{ display: 'grid', gap: '1.5rem' }}>
+                            {/* Personal Info */}
+                            <div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>First Name</label>
+                                        <input className="input" name="first_name" value={editForm.first_name} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>Last Name</label>
+                                        <input className="input" name="last_name" value={editForm.last_name} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                    </div>
+                                    <div style={{ gridColumn: 'span 2' }}>
+                                        <label style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', display: 'block' }}>Phone</label>
+                                        <input className="input" name="phone" value={editForm.phone} onChange={handleInputChange} style={{ padding: '0.6rem', borderRadius: '0.6rem', width: '100%' }} />
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                    <span className="text-muted">{t.profile.encryption}</span>
-                                    <span className="badge badge-success" style={{ fontSize: '0.65rem' }}>AES-256</span>
+                            </div>
+
+                            {/* Address Info */}
+                            <div>
+                                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1rem' }}>{t.profile.deliveryAddress}</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <input className="input" name="house_no" value={editForm.house_no} onChange={handleInputChange} placeholder={language === 'en' ? "House No." : "บ้านเลขที่"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
+                                    <input className="input" name="village" value={editForm.village} onChange={handleInputChange} placeholder={language === 'en' ? "Village No." : "หมู่ที่"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
+                                    <input className="input" name="road" value={editForm.road} onChange={handleInputChange} placeholder={language === 'en' ? "Road" : "ถนน"} style={{ padding: '0.6rem', borderRadius: '0.6rem', gridColumn: 'span 2' }} />
+                                    <input className="input" name="sub_district" value={editForm.sub_district} onChange={handleInputChange} placeholder={language === 'en' ? "Sub-district" : "ตำบล/แขวง"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
+                                    <input className="input" name="district" value={editForm.district} onChange={handleInputChange} placeholder={language === 'en' ? "District" : "อำเภอ/เขต"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
+                                    <input className="input" name="province" value={editForm.province} onChange={handleInputChange} placeholder={language === 'en' ? "Province" : "จังหวัด"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
+                                    <input className="input" name="zipcode" value={editForm.zipcode} onChange={handleInputChange} placeholder={language === 'en' ? "Zipcode" : "รหัสไปรษณีย์"} style={{ padding: '0.6rem', borderRadius: '0.6rem' }} />
                                 </div>
-                                <div style={{ borderTop: '1px solid #eee', marginTop: '0.5rem', paddingTop: '0.75rem' }}>
-                                    <button className="btn btn-outline" style={{ width: '100%', fontSize: '0.8rem', padding: '0.5rem' }}>{t.profile.updateSecurity}</button>
-                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button onClick={handleSaveClick} disabled={saveLoading} className="btn btn-primary" style={{ flex: 1, borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.8rem' }}>
+                                    {saveLoading ? <Loader2 className="spinner" size={20} /> : <Save size={20} />} {language === 'en' ? 'Save Changes' : 'บันทึกการเปลี่ยนแปลง'}
+                                </button>
+                                <button onClick={handleCancelClick} disabled={saveLoading} className="btn btn-outline" style={{ flex: 1, borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.8rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                                    {language === 'en' ? 'Cancel' : 'ยกเลิก'}
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
 
             <style>{`
                 .table-row-hover { transition: all 0.2s ease; }
@@ -344,7 +443,7 @@ export default function Profile() {
                 .spinner { animation: spin 1s linear infinite; }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             `}</style>
-        </div>
+        </div >
     )
 }
 

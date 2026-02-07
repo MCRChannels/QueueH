@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Stethoscope, User, Calendar, LogOut, Truck, Shield, Building, Menu, X, Globe } from 'lucide-react'
+import { Stethoscope, User, Calendar, LogOut, Truck, Shield, Building, Menu, X, Globe, Clock } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 
@@ -29,8 +29,15 @@ export default function Navbar({ session }) {
         const handleScroll = () => {
             setScrolled(window.scrollY > 20)
         }
+        const handleResize = () => {
+            if (window.innerWidth > 992) setIsMenuOpen(false)
+        }
         window.addEventListener('scroll', handleScroll)
-        return () => window.removeEventListener('scroll', handleScroll)
+        window.addEventListener('resize', handleResize)
+        return () => {
+            window.removeEventListener('scroll', handleScroll)
+            window.removeEventListener('resize', handleResize)
+        }
     }, [])
 
     const handleLogout = async () => {
@@ -40,18 +47,23 @@ export default function Navbar({ session }) {
 
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
-    const navLinks = [
-        { to: '/', label: t.hospitals, icon: <Calendar size={20} /> },
-        { to: '/consult', label: t.consult, icon: <Stethoscope size={20} /> },
-        { to: '/profile', label: t.profile, icon: <User size={20} /> },
+    const allLinks = [
+        { to: '/', label: t.hospitals, icon: <Calendar size={20} /> }
     ]
 
-    const roleLinks = []
-    if (role === 'pharmacist') roleLinks.push({ to: '/delivery', label: t.delivery, icon: <Truck size={20} />, color: '#10b981' })
-    if (role === 'admin') roleLinks.push({ to: '/admin', label: t.admin, icon: <Shield size={20} />, color: 'var(--primary)' })
-    if (role === 'doctor_opd') roleLinks.push({ to: '/opd', label: t.opd, icon: <Building size={20} />, color: 'var(--primary)' })
+    if (role === 'patient' || role === 'doctor_online') {
+        allLinks.push({ to: '/consult', label: t.consult, icon: <Stethoscope size={20} /> })
+    }
 
-    const allLinks = [...navLinks, ...roleLinks]
+    allLinks.push({ to: '/profile', label: t.profile, icon: <User size={20} /> })
+
+    if (role === 'patient') {
+        allLinks.push({ to: '/my-queue', label: 'MyQ', icon: <Clock size={20} /> })
+    }
+
+    if (role === 'pharmacist') allLinks.push({ to: '/delivery', label: t.delivery, icon: <Truck size={20} />, color: '#10b981' })
+    if (role === 'admin') allLinks.push({ to: '/admin', label: t.admin, icon: <Shield size={20} />, color: 'var(--primary)' })
+    if (role === 'doctor_opd') allLinks.push({ to: '/opd', label: t.opd, icon: <Building size={20} />, color: 'var(--primary)' })
 
     return (
         <nav
@@ -153,7 +165,6 @@ export default function Navbar({ session }) {
                     onClick={toggleMenu}
                     className="mobile-toggle"
                     style={{
-                        display: 'none',
                         background: 'var(--primary-light)',
                         color: 'var(--primary)',
                         padding: '0.5rem',
@@ -174,9 +185,8 @@ export default function Navbar({ session }) {
                         left: 0,
                         right: 0,
                         padding: '1rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
+                        // display: 'flex',  <-- Moved to CSS class
+                        // flexDirection: 'column', <-- Moved to CSS class
                         marginTop: '0.5rem',
                         margin: '0.5rem 1rem',
                         borderRadius: '1rem',

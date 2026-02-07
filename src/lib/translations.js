@@ -20,10 +20,10 @@ export const translations = {
             totalQueues: 'Total Queues',
             currentlyIn: 'Currently In',
             bookAppointment: 'Book Appointment',
-            inQueue: 'Successfully in Queue',
+            inQueue: 'In Queue',
             cancelAppointment: 'Cancel Appointment',
             accessRestricted: 'Access Restricted',
-            multiBookingRestricted: 'Multi-Booking Restricted',
+            multiBookingRestricted: 'You already have a queue',
             confirmAppointment: 'Confirm Appointment',
             reviewDetails: 'Review your clinical dispatch details',
             medicalFacility: 'Medical Facility',
@@ -42,7 +42,10 @@ export const translations = {
                 mistake: 'Booked by mistake',
                 other: 'Other'
             },
-            specifyReason: 'Please specify your reason...'
+            specifyReason: 'Please specify your reason...',
+            attendingDoctor: 'Attending Doctor',
+            serviceClosed: 'Service Temporarily Closed',
+            closed: 'Closed'
         },
         auth: {
             loginTitle: 'Welcome Back',
@@ -159,7 +162,9 @@ export const translations = {
             myQueue: 'My Patient Queue',
             nextPatient: 'Call Next Patient',
             currentlyTreating: 'Currently Treating',
-            treating: 'Treating'
+            treating: 'Treating',
+            shiftActiveError: 'Only one doctor can be on duty. Please wait for the current doctor to end their shift.',
+            endShiftSuccess: 'Shift ended successfully'
         }
     },
     th: {
@@ -186,7 +191,7 @@ export const translations = {
             inQueue: 'คุณอยู่ในคิวแล้ว',
             cancelAppointment: 'ยกเลิกการจอง',
             accessRestricted: 'สิทธิ์การเข้าถึงจำกัด',
-            multiBookingRestricted: 'จำกัดการจองซ้อน',
+            multiBookingRestricted: 'คุณมีคิวอยู่แล้ว (จองซ้ำไม่ได้)',
             confirmAppointment: 'ยืนยันการนัดหมาย',
             reviewDetails: 'ตรวจสอบรายละเอียดการเข้ารับบริการของคุณ',
             medicalFacility: 'สถานพยาบาล',
@@ -205,7 +210,10 @@ export const translations = {
                 mistake: 'กดจองผิดพลาด',
                 other: 'อื่นๆ'
             },
-            specifyReason: 'กรุณาระบุเหตุผลของคุณ...'
+            specifyReason: 'กรุณาระบุเหตุผลของคุณ...',
+            attendingDoctor: 'แพทย์ผู้ตรวจ',
+            serviceClosed: 'ปิดรับการจองชั่วคราว',
+            closed: 'ปิดให้บริการ'
         },
         auth: {
             loginTitle: 'ยินดีต้อนรับกลับมา',
@@ -322,7 +330,9 @@ export const translations = {
             myQueue: 'คิวผู้ป่วยของฉัน',
             nextPatient: 'เรียกผู้ป่วยคนถัดไป',
             currentlyTreating: 'กำลังทำการรักษา',
-            treating: 'กำลังตรวจ'
+            treating: 'กำลังตรวจ',
+            shiftActiveError: 'สามารถเข้าเวรได้ทีละคนเท่านั้น กรุณารอให้แพทย์ท่านก่อนหน้าลงเวรก่อน',
+            endShiftSuccess: 'ลงเวรเรียบร้อยแล้ว'
         }
     }
 };

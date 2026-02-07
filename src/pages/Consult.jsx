@@ -12,6 +12,46 @@ export default function Consult() {
     const { language } = useLanguage()
     const t = translations[language]
 
+    // Notification Sound (Simple "Glass" Ping - Base64)
+    const playNotificationSound = () => {
+        try {
+            // Short simplified beep
+            const ctx = new (window.AudioContext || window.webkitAudioContext)()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.type = 'sine'
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime) // C5
+            osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1) // Slide up
+            gain.gain.setValueAtTime(0.1, ctx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+            osc.start()
+            osc.stop(ctx.currentTime + 0.3)
+        } catch (e) {
+            console.error('Audio play failed', e)
+        }
+    }
+
+    const sendQueueNotification = (title, body) => {
+        if (!("Notification" in window)) return
+
+        if (Notification.permission === "granted") {
+            try {
+                new Notification(title, { body, icon: '/vite.svg' })
+                playNotificationSound()
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+            } catch (e) { console.error(e) }
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, { body, icon: '/vite.svg' })
+                    playNotificationSound()
+                }
+            })
+        }
+    }
+
     // Logic
     const [doctorsOnlineCount, setDoctorsOnlineCount] = useState(0)
     const [isDoctorOnline, setIsDoctorOnline] = useState(false)
@@ -41,6 +81,9 @@ export default function Consult() {
     const [summaryText, setSummaryText] = useState('')
     const [deliveryFee] = useState(50)
 
+    // Notification State
+    const lastNotifiedPosition = useRef(null)
+
     // UI State
     const [showMedicalPanel, setShowMedicalPanel] = useState(window.innerWidth > 768)
 
@@ -48,6 +91,8 @@ export default function Consult() {
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
             remoteVideoRef.current.srcObject = remoteStream
+            remoteVideoRef.current.muted = false // IMPORTANT: Ensure not muted
+            remoteVideoRef.current.volume = 1.0
             remoteVideoRef.current.play().catch(e => console.error('Error auto-playing video:', e))
         }
     }, [remoteStream, callStatus])
@@ -120,6 +165,9 @@ export default function Consult() {
 
                     call.on('stream', (remoteStream) => {
                         console.log('Received remote stream (Incoming Call)')
+                        // Explicitly enable audio tracks just in case
+                        remoteStream.getAudioTracks().forEach(track => track.enabled = true)
+
                         window.lastCallStarted = Date.now()
                         setCallStatus('connected')
                         setRemoteStream(remoteStream)
@@ -213,6 +261,11 @@ export default function Consult() {
         if (profile.role === 'patient') {
             checkDoctorsOnline()
 
+            // Request Notification Permission early
+            if ("Notification" in window && Notification.permission === 'default') {
+                Notification.requestPermission()
+            }
+
             // Restore State: Check if I'm already waiting or have a pending summary
             const checkExisting = async () => {
                 // 1. Check Waiting
@@ -283,6 +336,43 @@ export default function Consult() {
             fetchIncomingPatients()
         }
     }, [profile])
+
+
+    // -- QUEUE NOTIFICATION LOGIC --
+    useEffect(() => {
+        // Only for patients who are waiting
+        if (profile?.role === 'patient' && callStatus === 'waiting' && incomingPatients.length > 0) {
+            const myIndex = incomingPatients.findIndex(p => p.patient_id === session.user.id)
+
+            if (myIndex !== -1) {
+                const queuePosition = myIndex + 1 // 1st, 2nd, 3rd...
+
+                // If position changed significantly or is critical
+                if (queuePosition !== lastNotifiedPosition.current) {
+
+                    // Logic: Notify at 5, 3, and 1
+                    if (queuePosition === 1) {
+                        sendQueueNotification(
+                            language === 'en' ? 'You are Next!' : 'คุณคือคิวถัดไป!',
+                            language === 'en' ? 'Please stay on this page and prepare for your consultation.' : 'กรุณารอที่หน้านี้และเตรียมตัวสำหรับการปรึกษา'
+                        )
+                    } else if (queuePosition === 3) {
+                        sendQueueNotification(
+                            language === 'en' ? '3 Queues Remaining' : 'อีก 3 คิวจะถึงตาคุณ',
+                            language === 'en' ? 'Get ready, your turn is coming up soon.' : 'เตรียมตัวไว้นะครับ ใกล้ถึงคิวแล้ว'
+                        )
+                    } else if (queuePosition === 5) {
+                        sendQueueNotification(
+                            language === 'en' ? '5 Queues Remaining' : 'อีก 5 คิวจะถึงตาคุณ',
+                            language === 'en' ? 'We will notify you when you are closer.' : 'เราจะแจ้งเตือนเมื่อใกล้ถึงคิว'
+                        )
+                    }
+
+                    lastNotifiedPosition.current = queuePosition
+                }
+            }
+        }
+    }, [incomingPatients, callStatus, profile, session, language])
 
     // Sync Prescription on Summary
     useEffect(() => {
@@ -443,6 +533,11 @@ export default function Consult() {
 
             call.on('stream', (remoteStream) => {
                 console.log('Received remote stream (Outgoing Call)')
+                // FIX: Ensure audio is enabled
+                remoteStream.getAudioTracks().forEach(track => {
+                    track.enabled = true
+                })
+
                 window.lastCallStarted = Date.now()
                 setCallStatus('connected')
                 setRemoteStream(remoteStream)
@@ -585,22 +680,44 @@ export default function Consult() {
     // 1. VIDEO ROOM UI
     if (callStatus === 'connected' || callStatus === 'connecting') {
         const isDoctor = profile.role === 'doctor_online' || profile.role === 'admin'
+        // Increase threshold slightly for iPad or rely on touch capability, 
+        // but for now keeping 768. iPad Mini is 768+. 
+        // Issue on iPad might be "Desktop" view having buttons sink.
         const isMobile = window.innerWidth <= 768
 
         return (
-            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0f172a', zIndex: 9999, display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh', // Fallback
+                height: '100dvh', // Modern mobile browsers
+                background: '#0f172a',
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row'
+            }}>
                 {/* Main Content Area (Video) */}
                 <div style={{
                     flex: 1,
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
-                    height: isMobile && showMedicalPanel ? '35%' : '100%',
-                    transition: 'height 0.3s ease'
+                    height: '100%',
+                    overflow: 'hidden'
                 }}>
 
                     {/* Remote Video Container */}
-                    <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    <div style={{
+                        flex: 1,
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        background: '#000'
+                    }}>
                         {callStatus === 'connecting' && (
                             <div className="glass animate-fade-in" style={{ position: 'absolute', zIndex: 10, color: 'white', padding: '1rem 2rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                 <Loader2 className="spinner" size={20} />
@@ -613,66 +730,150 @@ export default function Consult() {
                             autoPlay
                             playsInline
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            onPlaying={() => console.log('Video playing')}
-                            onWaiting={() => console.log('Video buffering/waiting')}
-                            onStalled={() => console.log('Video stalled')}
                         />
 
                         {/* Manual Play Button for iOS if stubborn */}
-                        <div style={{ position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
-                            <button
-                                onClick={() => remoteVideoRef.current && remoteVideoRef.current.play()}
-                                style={{ background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid white', borderRadius: '20px', padding: '5px 15px', fontSize: '12px' }}>
-                                Tap to Retry Video
-                            </button>
+                        <div style={{ position: 'absolute', bottom: '150px', left: '50%', transform: 'translateX(-50%)', zIndex: 50, pointerEvents: 'none', opacity: 0 }}>
+                            {/* Hidden unless needed logic added later, keeping structure clean */}
                         </div>
 
                         {/* Self View (Pip) */}
                         <div style={{
-                            position: 'absolute', top: '1rem', right: '1rem',
+                            position: 'absolute',
+                            top: isMobile ? '1rem' : '2rem',
+                            right: isMobile ? '1rem' : '2rem',
                             width: isMobile ? '100px' : '240px',
                             height: isMobile ? '75px' : '180px',
-                            borderRadius: '1rem', border: '2px solid rgba(255,255,255,0.2)',
-                            overflow: 'hidden', background: '#334155',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
-                            zIndex: 20
+                            borderRadius: '1rem',
+                            border: '1.5px solid rgba(255,255,255,0.2)',
+                            overflow: 'hidden',
+                            background: '#334155',
+                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                            zIndex: 20,
+                            transition: 'all 0.3s ease'
                         }}>
                             <video ref={myVideoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                         </div>
-
-                        {/* Mobile Controls (Top-Left overlay so they don't block bottom form) */}
-                        {isMobile && (
-                            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', display: 'flex', gap: '0.5rem', zIndex: 30 }}>
-                                <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '45px', height: '45px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.9)' : 'rgba(239, 68, 68, 0.9)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                                </button>
-                                <button onClick={endCall} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)' }}>
-                                    <PhoneOff size={20} />
-                                </button>
-                                {isDoctor && !showMedicalPanel && (
-                                    <button onClick={() => setShowMedicalPanel(true)} style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'white', border: 'none', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)' }}>
-                                        <Stethoscope size={20} />
-                                    </button>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    {/* Integrated Controls Bar */}
+                    {/* CONTROLS */}
+
+                    {/* Mobile Controls: Centered Floating Island */}
+                    {isMobile && (
+                        <div style={{
+                            position: 'fixed',
+                            bottom: '2rem',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'flex',
+                            gap: '1.5rem',
+                            zIndex: 100,
+                            padding: '12px 24px',
+                            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', // Safe Area Logic
+                            borderRadius: '50px',
+                            background: 'rgba(15, 23, 42, 0.7)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                            alignItems: 'center'
+                        }}>
+                            <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{
+                                width: '50px', height: '50px', borderRadius: '50%',
+                                background: isAudioEnabled ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.9)',
+                                border: isAudioEnabled ? '1px solid rgba(59, 130, 246, 0.5)' : 'none',
+                                color: isAudioEnabled ? 'white' : 'white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+                            </button>
+
+                            <button onClick={endCall} style={{
+                                width: '60px', height: '60px', borderRadius: '50%',
+                                background: '#ef4444',
+                                border: '4px solid rgba(239, 68, 68, 0.3)',
+                                color: 'white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
+                            }}>
+                                <PhoneOff size={28} fill="white" />
+                            </button>
+
+                            {isDoctor && !showMedicalPanel && (
+                                <button onClick={() => setShowMedicalPanel(true)} style={{
+                                    width: '50px', height: '50px', borderRadius: '50%',
+                                    background: 'white',
+                                    border: 'none',
+                                    color: 'var(--primary)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                }}>
+                                    <Stethoscope size={24} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Desktop/Tablet Controls: Integrated Bar with Safe Area */}
                     {!isMobile && (
-                        <div style={{ padding: '2rem', background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '1rem', zIndex: 30, pointerEvents: 'none' }}>
-                            <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1rem' }}>
-                                <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isAudioEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{
+                            position: 'fixed',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            padding: '1.5rem',
+                            paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))', // Safe Area Logic
+                            background: 'linear-gradient(to top, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.6) 60%, transparent 100%)',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            gap: '1.5rem',
+                            zIndex: 30,
+                            pointerEvents: 'none' // Allow clicks mostly to pass through, but catch on buttons
+                        }}>
+                            <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                                <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{
+                                    width: '56px', height: '56px', borderRadius: '50%',
+                                    background: isAudioEnabled ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.9)',
+                                    border: isAudioEnabled ? '1px solid rgba(59, 130, 246, 0.5)' : 'none',
+                                    color: 'white',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    backdropFilter: 'blur(5px)'
+                                }}>
                                     {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
                                 </button>
-                                <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{ width: '60px', height: '60px', borderRadius: '50%', background: isVideoEnabled ? 'rgba(59, 130, 246, 0.8)' : 'rgba(239, 68, 68, 0.8)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+                                <button onClick={toggleVideo} className={`btn-circle ${isVideoEnabled ? '' : 'btn-danger'}`} style={{
+                                    width: '56px', height: '56px', borderRadius: '50%',
+                                    background: isVideoEnabled ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.9)',
+                                    border: isVideoEnabled ? '1px solid rgba(59, 130, 246, 0.5)' : 'none',
+                                    color: 'white',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    backdropFilter: 'blur(5px)'
+                                }}>
                                     {isVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
                                 </button>
-                                <button onClick={endCall} style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ef4444', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <PhoneOff size={24} />
+
+                                <button onClick={endCall} style={{
+                                    width: '72px', height: '72px', borderRadius: '50%',
+                                    background: '#ef4444',
+                                    border: '4px solid rgba(239, 68, 68, 0.3)',
+                                    color: 'white',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    boxShadow: '0 8px 20px rgba(239, 68, 68, 0.4)',
+                                    transform: 'translateY(-4px)'
+                                }}>
+                                    <PhoneOff size={32} fill="white" />
                                 </button>
+
                                 {isDoctor && (
-                                    <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{ width: '60px', height: '60px', borderRadius: '50%', background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.2)', border: 'none', color: showMedicalPanel ? 'var(--primary)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{
+                                        width: '56px', height: '56px', borderRadius: '50%',
+                                        background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.15)',
+                                        border: 'none',
+                                        color: showMedicalPanel ? 'var(--primary)' : 'white',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        backdropFilter: 'blur(5px)'
+                                    }}>
                                         <Stethoscope size={24} />
                                     </button>
                                 )}
@@ -694,6 +895,9 @@ export default function Consult() {
                         borderLeft: !isMobile ? '1px solid var(--border-color)' : 'none',
                         borderTop: isMobile ? '4px solid var(--primary)' : 'none',
                         zIndex: 40,
+                        position: isMobile ? 'fixed' : 'relative',
+                        bottom: isMobile ? 0 : 'auto',
+                        left: isMobile ? 0 : 'auto',
                         boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.1)' : 'none'
                     }}>
                         <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -894,7 +1098,9 @@ export default function Consult() {
                                             display: 'flex',
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
-                                            padding: '1.5rem 2rem',
+                                            flexWrap: 'wrap',
+                                            gap: '1.5rem',
+                                            padding: '1.5rem',
                                             background: idx === 0 ? 'var(--primary-light)' : 'white',
                                             border: idx === 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                                             borderRadius: '1.5rem'

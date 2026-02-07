@@ -9,7 +9,7 @@ export default function Home() {
     const navigate = useNavigate()
     const [hospitals, setHospitals] = useState([])
     const [loading, setLoading] = useState(true)
-    const [selectedHospital, setSelectedHospital] = useState(null)
+    const [selectedHospitalIdForModal, setSelectedHospitalIdForModal] = useState(null) // Changed to ID for realtime updates
     const { language } = useLanguage()
     const t = translations[language]
     const [bookingLoading, setBookingLoading] = useState(false)
@@ -21,6 +21,51 @@ export default function Home() {
     const [cancelReason, setCancelReason] = useState('')
     const [otherReason, setOtherReason] = useState('')
     const [cancelling, setCancelling] = useState(false)
+
+    // Derived state for modal (always fresh)
+    const selectedHospital = hospitals.find(h => h.id === selectedHospitalIdForModal) || null
+
+    // Notification State
+    const lastNotifiedQueueDiff = React.useRef(null)
+
+    // Notification Sound
+    const playNotificationSound = () => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.type = 'sine'
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime)
+            osc.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.1)
+            gain.gain.setValueAtTime(0.1, ctx.currentTime)
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+            osc.start()
+            osc.stop(ctx.currentTime + 0.3)
+        } catch (e) {
+            console.error('Audio play failed', e)
+        }
+    }
+
+    const sendQueueNotification = (title, body) => {
+        if (!("Notification" in window)) return
+
+        if (Notification.permission === "granted") {
+            try {
+                new Notification(title, { body, icon: '/vite.svg' })
+                playNotificationSound()
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+            } catch (e) { console.error(e) }
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, { body, icon: '/vite.svg' })
+                    playNotificationSound()
+                }
+            })
+        }
+    }
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,6 +83,11 @@ export default function Home() {
 
         fetchHospitals()
 
+        // Notification Permission Request for active queue users within effect
+        if ("Notification" in window && Notification.permission === 'default') {
+            Notification.requestPermission()
+        }
+
         const channel = supabase
             .channel('hospitals-realtime')
             .on('postgres_changes', { event: '*', table: 'hospitals' }, (payload) => {
@@ -54,6 +104,46 @@ export default function Home() {
             supabase.removeChannel(channel)
         }
     }, [])
+
+    // -- QUEUE NOTIFICATION LOGIC (OPD) --
+    useEffect(() => {
+        if (!activeQueueId || !activeHospitalId || hospitals.length === 0) return
+
+        // 1. Find my queue number
+        const checkMyStatus = async () => {
+            const { data: myQueue } = await supabase.from('queues').select('queue_number').eq('id', activeQueueId).single()
+            const hospital = hospitals.find(h => h.id === activeHospitalId)
+
+            if (myQueue && hospital) {
+                const currentServing = hospital.current_queue || 0
+                const myNumber = myQueue.queue_number
+                const diff = myNumber - currentServing // How many people ahead
+
+                // Logic: Notify if queues remaining are specific thresholds
+                if (diff > 0 && diff !== lastNotifiedQueueDiff.current) {
+                    if (diff === 1) {
+                        sendQueueNotification(
+                            language === 'en' ? 'You are Next!' : 'ถึงคิวของคุณแล้ว!',
+                            language === 'en' ? `Please proceed to ${hospital.name}` : `กรุณาไปที่ ${hospital.name}`
+                        )
+                    } else if (diff === 3) {
+                        sendQueueNotification(
+                            language === 'en' ? '3 Queues Remaining' : 'อีก 3 คิวจะถึงตาคุณ',
+                            language === 'en' ? `Get ready at ${hospital.name}` : `เตรียมตัวรอเรียกที่ ${hospital.name}`
+                        )
+                    } else if (diff === 5) {
+                        sendQueueNotification(
+                            language === 'en' ? '5 Queues Remaining' : 'อีก 5 คิวจะถึงตาคุณ',
+                            language === 'en' ? `Prepare yourself.` : `เตรียมตัวให้พร้อม`
+                        )
+                    }
+                    lastNotifiedQueueDiff.current = diff
+                }
+            }
+        }
+
+        checkMyStatus()
+    }, [hospitals, activeQueueId, activeHospitalId])
 
     const fetchProfile = async (userId) => {
         const { data } = await supabase.from('profiles').select('credibility_score').eq('id', userId).single()
@@ -78,9 +168,28 @@ export default function Home() {
 
     const fetchHospitals = async () => {
         try {
-            const { data, error } = await supabase.from('hospitals').select('*').eq('is_open', true)
-            if (error) setHospitals([])
-            else setHospitals(data)
+            const { data, error } = await supabase.from('hospitals')
+                .select('*')
+                .order('name', { ascending: true })
+
+            if (error) {
+                setHospitals([])
+                return
+            }
+
+            // Enrich data with active doctor info IF the column exists
+            const enriched = await Promise.all(data.map(async (h) => {
+                if (h.active_doctor_id) {
+                    const { data: doc } = await supabase.from('profiles')
+                        .select('first_name, last_name')
+                        .eq('id', h.active_doctor_id)
+                        .single()
+                    return { ...h, active_doctor: doc }
+                }
+                return h
+            }))
+
+            setHospitals(enriched)
         } catch (err) {
             console.error(err)
         } finally {
@@ -95,7 +204,7 @@ export default function Home() {
             alert(language === 'en' ? 'Security Alert: You already have an active booking.' : 'แจ้งเตือนความปลอดภัย: คุณมีการจองที่ยังคงค้างอยู่ กรุณาดำเนินการให้เสร็จสิ้นหรือยกเลิกก่อนจองใหม่')
             return
         }
-        setSelectedHospital(hospital)
+        setSelectedHospitalIdForModal(hospital.id)
     }
 
     const confirmBooking = async () => {
@@ -124,9 +233,13 @@ export default function Home() {
             const waitTime = calculateWaitTime(selectedHospital.avg_waiting_time, selectedHospital.total_queues)
             alert(`Booking Confirmed!\nYour Queue: #${nextQueue}\nEstimated Wait: ${waitTime} mins`)
 
-            setSelectedHospital(null)
+            // 2. Optimistic Update (Optional, as realtime will catch it)
+
+            // 3. Reset UI
+            setSelectedHospitalIdForModal(null)
             checkActiveBooking(user.id)
             fetchHospitals() // Refresh local state
+            navigate('/my-queue')
         } catch (err) {
             console.error('Booking Error:', err)
             alert('Error booking queue: ' + err.message)
@@ -181,11 +294,16 @@ export default function Home() {
         }
     }
 
-    const calculateWaitTime = (avg, total) => {
-        const gravity = 1.2 // Reduced gravity slightly for better balance
-        const base = Math.max(avg, 10)
-        // Logic: if queue is empty, still takes base time. Each person adds ~3-5 mins.
-        return Math.round((base + (total * 8)) * gravity)
+    const calculateWaitTime = (avg, total, current) => {
+        // Logic: Calculate actual people waiting
+        const waitingCount = Math.max(0, total - (current || 0))
+        if (waitingCount === 0) return 0 // No wait
+
+        const timePerPerson = avg || 15
+        const rawTime = waitingCount * timePerPerson
+
+        // Round to nearest 5 mins for "approximate" feel
+        return Math.ceil(rawTime / 5) * 5
     }
 
     return (
@@ -211,7 +329,7 @@ export default function Home() {
                 }} />
                 <div className="container">
                     <div className="animate-fade-in" style={{ maxWidth: '600px' }}>
-                        <h1 style={{ fontSize: '3rem', fontWeight: '800', marginBottom: '1rem', letterSpacing: '-0.02em', lineHeight: '1.1' }}>
+                        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: '800', marginBottom: '1rem', letterSpacing: '-0.02em', lineHeight: '1.1' }}>
                             {t.home.heroTitle}
                         </h1>
                         <p style={{ fontSize: '1.25rem', opacity: 0.9, marginBottom: '2rem' }}>
@@ -243,28 +361,52 @@ export default function Home() {
                         <Loader2 className="spinner" size={40} color="var(--primary)" />
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '2rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                         {hospitals.map(hospital => (
-                            <div key={hospital.id} className="glass-card animate-fade-in" style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div key={hospital.id} className="glass-card animate-fade-in" style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                opacity: hospital.is_open ? 1 : 0.75,
+                                filter: hospital.is_open ? 'none' : 'grayscale(1)',
+                                background: hospital.is_open ? 'white' : 'var(--bg-color)',
+                                transition: 'all 0.3s ease'
+                            }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                                     <div style={{
-                                        background: 'var(--primary-light)',
-                                        color: 'var(--primary)',
+                                        background: hospital.is_open ? 'var(--primary-light)' : 'var(--border-color)',
+                                        color: hospital.is_open ? 'var(--primary)' : 'var(--text-muted)',
                                         padding: '0.75rem',
                                         borderRadius: '1rem'
                                     }}>
                                         <Hospital size={24} />
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontWeight: '700', fontSize: '1.25rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: hospital.is_open ? 'var(--success)' : 'var(--text-muted)', fontWeight: '700', fontSize: '1.25rem' }}>
                                             <TrendingUp size={16} />
-                                            ~{calculateWaitTime(hospital.avg_waiting_time, hospital.total_queues)}m
+                                            ~{calculateWaitTime(hospital.avg_waiting_time, hospital.total_queues, hospital.current_queue)}m
                                         </div>
                                         <span className="text-muted">{t.home.estWait}</span>
                                     </div>
                                 </div>
 
-                                <h3 style={{ fontSize: '1.35rem', fontWeight: '700', marginBottom: '1.25rem' }}>{hospital.name}</h3>
+                                <h3 style={{ fontSize: '1.35rem', fontWeight: '700', marginBottom: '0.75rem' }}>{hospital.name}</h3>
+
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    marginBottom: '1.25rem',
+                                    fontSize: '0.875rem',
+                                    color: hospital.is_open ? 'var(--text-main)' : 'var(--text-muted)',
+                                    fontWeight: '600'
+                                }}>
+                                    <User size={16} color={hospital.is_open ? 'var(--primary)' : 'var(--text-muted)'} />
+                                    {hospital.is_open ? (
+                                        <span>{t.home.attendingDoctor}: <span style={{ color: 'var(--primary)' }}>{hospital.active_doctor ? `${hospital.active_doctor.first_name} ${hospital.active_doctor.last_name}` : 'Unknown'}</span></span>
+                                    ) : (
+                                        <span>{t.home.serviceClosed}</span>
+                                    )}
+                                </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
                                     <div style={{ background: 'var(--bg-color)', padding: '1rem', borderRadius: '1rem', textAlign: 'center' }}>
@@ -296,14 +438,14 @@ export default function Home() {
                                             Successfully in Queue
                                         </div>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); setShowCancelModal(true); }}
+                                            onClick={(e) => { e.stopPropagation(); navigate('/my-queue'); }}
                                             className="btn-outline"
                                             style={{
                                                 width: '100%',
                                                 padding: '1rem',
                                                 borderRadius: '1.25rem',
-                                                borderColor: '#ef4444',
-                                                color: '#ef4444',
+                                                borderColor: 'var(--primary)',
+                                                color: 'var(--primary)',
                                                 fontWeight: '700',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -312,25 +454,30 @@ export default function Home() {
                                                 background: 'transparent'
                                             }}
                                         >
-                                            <XCircle size={18} /> Cancel Appointment
+                                            <Clock size={18} /> View Digital Ticket
                                         </button>
+                                        <p style={{ fontSize: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', margin: 0 }}>
+                                            {language === 'en' ? 'Manage or cancel your booking in MyQ' : 'จัดการหรือยกเลิกการจองได้ที่เมนู MyQ'}
+                                        </p>
                                     </div>
                                 ) : (
                                     <button
-                                        className={`btn ${credibilityScore < 50 || (activeQueueId && activeHospitalId !== hospital.id) ? 'btn-outline' : 'btn-primary'}`}
+                                        className={`btn ${!hospital.is_open || credibilityScore < 50 || (activeQueueId && activeHospitalId !== hospital.id) ? 'btn-outline' : 'btn-primary'}`}
                                         style={{
                                             width: '100%',
                                             marginTop: 'auto',
                                             padding: '1.1rem',
-                                            opacity: activeQueueId && activeHospitalId !== hospital.id ? 0.5 : 1,
+                                            opacity: (activeQueueId && activeHospitalId !== hospital.id) || !hospital.is_open ? 0.6 : 1,
                                             borderRadius: '1.25rem',
                                             fontSize: '1rem',
                                             fontWeight: '700'
                                         }}
                                         onClick={() => handleBookClick(hospital)}
-                                        disabled={(credibilityScore < 50 && session) || (activeQueueId && activeHospitalId !== hospital.id)}
+                                        disabled={!hospital.is_open || (credibilityScore < 50 && session) || (activeQueueId && activeHospitalId !== hospital.id)}
                                     >
-                                        {(credibilityScore < 50 && session) ? (
+                                        {!hospital.is_open ? (
+                                            t.home.closed
+                                        ) : (credibilityScore < 50 && session) ? (
                                             t.home.accessRestricted
                                         ) : activeQueueId ? (
                                             t.home.multiBookingRestricted
@@ -392,7 +539,7 @@ export default function Home() {
                             <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ color: 'var(--text-muted)', fontWeight: '600', fontSize: '0.875rem' }}>{t.home.estWaitWindow}</span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--warning)', fontWeight: '800', fontSize: '1.125rem' }}>
-                                    <Clock size={18} /> ~{calculateWaitTime(selectedHospital.avg_waiting_time, selectedHospital.total_queues)}m
+                                    <Clock size={18} /> ~{calculateWaitTime(selectedHospital.avg_waiting_time, selectedHospital.total_queues, selectedHospital.current_queue)}m
                                 </div>
                             </div>
                         </div>

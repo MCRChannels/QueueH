@@ -9,6 +9,7 @@ import Profile from './pages/Profile'
 import Delivery from './pages/Delivery'
 import AdminDashboard from './pages/AdminDashboard'
 import DoctorOPD from './pages/DoctorOPD'
+import MyQueue from './pages/MyQueue'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import { supabase } from './lib/supabase'
@@ -56,6 +57,7 @@ function App() {
               <div style={{ padding: '2rem 0' }}>
                 <Routes>
                   <Route path="/" element={<Home />} />
+                  <Route path="/my-queue" element={session ? <MyQueue /> : <Navigate to="/login" />} />
                   <Route path="/consult" element={session ? <Consult /> : <Navigate to="/login" />} />
                   <Route path="/delivery" element={session ? <Delivery /> : <Navigate to="/login" />} />
                   <Route path="/admin" element={session ? <AdminDashboard /> : <Navigate to="/login" />} />

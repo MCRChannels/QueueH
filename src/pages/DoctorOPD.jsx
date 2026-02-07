@@ -59,7 +59,19 @@ export default function DoctorOPD() {
     }
 
     const fetchHospitalData = async (hospId) => {
-        const { data: hosp } = await supabase.from('hospitals').select('*').eq('id', hospId).single()
+        const { data: hosp } = await supabase.from('hospitals')
+            .select('*')
+            .eq('id', hospId)
+            .single()
+
+        if (hosp && hosp.active_doctor_id) {
+            const { data: doc } = await supabase.from('profiles')
+                .select('first_name, last_name')
+                .eq('id', hosp.active_doctor_id)
+                .single()
+            hosp.active_doctor = doc
+        }
+
         setHospital(hosp)
 
         const { data: qData } = await supabase.from('queues')
@@ -75,10 +87,54 @@ export default function DoctorOPD() {
     const toggleOpen = async () => {
         if (!hospital) return
         setActionLoading(true)
-        const { error } = await supabase.from('hospitals').update({ is_open: !hospital.is_open }).eq('id', hospital.id)
-        if (error) alert(error.message)
-        else await fetchHospitalData(hospital.id)
-        setActionLoading(false)
+
+        try {
+            if (!hospital.is_open) {
+                // TRYING TO OPEN: Check if someone else is already active
+                const { data: currentHosp, error: checkError } = await supabase.from('hospitals')
+                    .select('*')
+                    .eq('id', hospital.id)
+                    .single()
+
+                if (!checkError && currentHosp.is_open && currentHosp.active_doctor_id && currentHosp.active_doctor_id !== profile.id) {
+                    // Try to fetch doctor name separately
+                    const { data: doc } = await supabase.from('profiles').select('first_name, last_name').eq('id', currentHosp.active_doctor_id).single()
+                    const docName = doc ? `${doc.first_name} ${doc.last_name}` : 'Unknown'
+                    alert(`${t.doctor.shiftActiveError}\n(Active: ${docName})`)
+                    setActionLoading(false)
+                    return
+                }
+
+                // Proceed to open
+                const updateData = { is_open: true }
+                // Only try to update active_doctor_id if the column exists (optimistic check)
+                if ('active_doctor_id' in (currentHosp || {})) {
+                    updateData.active_doctor_id = profile.id
+                }
+
+                const { error } = await supabase.from('hospitals')
+                    .update(updateData)
+                    .eq('id', hospital.id)
+                if (error) throw error
+            } else {
+                // TRYING TO CLOSE
+                const updateData = { is_open: false }
+                if ('active_doctor_id' in (hospital || {})) {
+                    updateData.active_doctor_id = null
+                }
+
+                const { error } = await supabase.from('hospitals')
+                    .update(updateData)
+                    .eq('id', hospital.id)
+                if (error) throw error
+            }
+
+            await fetchHospitalData(hospital.id)
+        } catch (err) {
+            alert(err.message)
+        } finally {
+            setActionLoading(false)
+        }
     }
 
     const callNext = async () => {
@@ -172,33 +228,59 @@ export default function DoctorOPD() {
 
     return (
         <div style={{ background: 'var(--bg-color)', minHeight: '100vh', paddingBottom: '5rem' }}>
-            <div className="glass" style={{ borderBottom: '1px solid var(--border-color)', background: 'white', padding: '1.5rem 0' }}>
-                <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
+            <div className="glass" style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.9)', padding: '1.5rem 0', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+
+                    {/* Left: Hospital & Doctor Info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>{hospital?.name}</h1>
-                            <div className={`badge ${hospital?.is_open ? 'badge-success' : 'badge-danger'}`}>
-                                {hospital?.is_open ? (language === 'en' ? 'Room Active' : 'เปิดให้บริการ') : (language === 'en' ? 'Room Offline' : 'ปิดให้บริการ')}
+                            <div style={{ padding: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '0.75rem' }}>
+                                <Hospital size={24} />
                             </div>
+                            <h1 style={{ fontSize: '1.75rem', fontWeight: '800', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{hospital?.name}</h1>
                         </div>
-                        <p className="text-muted" style={{ marginTop: '0.25rem' }}>{profile.first_name} {profile.last_name} • {language === 'en' ? 'Attending Doctor' : 'แพทย์ผู้รักษา'}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', paddingLeft: '0.5rem' }}>
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--secondary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: '700' }}>
+                                {profile.first_name?.[0]}
+                            </div>
+                            <p className="text-muted" style={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                                Dr. {profile.first_name} {profile.last_name}
+                                <span style={{ margin: '0 0.5rem', opacity: 0.3 }}>|</span>
+                                <span style={{ color: 'var(--primary)', fontWeight: '700' }}>{language === 'en' ? 'Attending Physician' : 'แพทย์ผู้รักษา'}</span>
+                            </p>
+                        </div>
                     </div>
-                    <button
-                        onClick={toggleOpen}
-                        disabled={actionLoading}
-                        className={`btn ${hospital?.is_open ? 'btn-danger' : 'btn-success'}`}
-                        style={{
-                            background: hospital?.is_open ? undefined : '#10b981',
-                            color: hospital?.is_open ? undefined : 'white',
-                            borderColor: hospital?.is_open ? undefined : '#10b981'
-                        }}>
-                        {actionLoading ? <Loader2 className="spinner" size={18} /> : (
-                            <>
-                                <Power size={18} />
-                                {hospital?.is_open ? (language === 'en' ? 'End Shift' : 'ปิดคิว') : (language === 'en' ? 'Start Shift' : 'เปิดคิว')}
-                            </>
-                        )}
-                    </button>
+
+                    {/* Right: Status & Action */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+
+                        {/* Status Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: hospital?.is_open ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', padding: '0.5rem 1rem', borderRadius: '1rem', border: hospital?.is_open ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: hospital?.is_open ? '#10b981' : '#ef4444', boxShadow: hospital?.is_open ? '0 0 10px #10b981' : 'none' }}></div>
+                            <span style={{ color: hospital?.is_open ? '#10b981' : '#ef4444', fontWeight: '700', fontSize: '0.9rem' }}>
+                                {hospital?.is_open ? (language === 'en' ? 'System Online' : 'ระบบเปิดรับคิว') : (language === 'en' ? 'System Offline' : 'ระบบปิดรับคิว')}
+                            </span>
+                        </div>
+
+                        {/* Toggle Button */}
+                        <button
+                            onClick={toggleOpen}
+                            disabled={actionLoading}
+                            className={`btn ${hospital?.is_open ? 'btn-danger' : 'btn-success'}`}
+                            style={{
+                                padding: '0.75rem 1.75rem',
+                                borderRadius: '1rem',
+                                fontWeight: '700',
+                                boxShadow: hospital?.is_open ? '0 4px 15px rgba(239, 68, 68, 0.2)' : '0 4px 15px rgba(16, 185, 129, 0.2)'
+                            }}>
+                            {actionLoading ? <Loader2 className="spinner" size={20} /> : (
+                                <>
+                                    <Power size={20} />
+                                    {hospital?.is_open ? (language === 'en' ? 'Close Queue' : 'ปิดรับคิว') : (language === 'en' ? 'Open Queue' : 'เปิดรับคิว')}
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
 
