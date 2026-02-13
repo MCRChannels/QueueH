@@ -186,7 +186,7 @@ export default function NotificationManager({ session }) {
             {/* iOS Help Banner - Crucial for iPhone lock screen notifications */}
             {showIOSInstruction && session && (
                 <div style={{
-                    position: 'fixed', bottom: '1.5rem', left: '1.5rem', right: '1.5rem',
+                    position: 'fixed', bottom: showPermissionBanner ? '8rem' : '1.5rem', left: '1.5rem', right: '1.5rem',
                     background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)',
                     color: 'white', padding: '1.25rem', borderRadius: '1.5rem', zIndex: 9999,
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',

@@ -255,7 +255,7 @@ export default function Profile() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gap: '2.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
+            <div style={{ display: 'grid', gap: '2.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))' }}>
 
                 {/* Physical Hospital Visits */}
                 <div className="glass-card animate-fade-in" style={{ padding: 0, animationDelay: '0.1s', display: 'flex', flexDirection: 'column' }}>
@@ -439,8 +439,8 @@ export default function Profile() {
 
             {/* Edit Profile Modal */}
             {isEditing && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' }}>
-                    <div className="glass-card animate-fade-in" style={{ padding: '2rem', maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', background: 'white' }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)', overflowY: 'auto', padding: '2rem 1rem', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+                    <div className="glass-card animate-fade-in" style={{ padding: 'clamp(1.25rem, 4vw, 2rem)', maxWidth: '600px', width: '100%', background: 'white', margin: 'auto 0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>{language === 'en' ? 'Edit Profile' : 'แก้ไขข้อมูลส่วนตัว'}</h3>
                             <button onClick={handleCancelClick} className="btn-icon"><X size={24} /></button>

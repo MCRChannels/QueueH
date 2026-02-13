@@ -224,9 +224,25 @@ button {
 }
 
 /* Responsive Utilities */
+.mobile-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem;
+  }
+
+  /* Improve touch targets on mobile */
+  .btn {
+    min-height: 44px;
+  }
+
+  .input {
+    min-height: 44px;
+    font-size: 16px;
+    /* Prevents iOS zoom on focus */
   }
 }
 

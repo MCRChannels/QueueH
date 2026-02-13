@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Peer } from 'peerjs'
-import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, XCircle, Trash2, CheckCircle, UserCheck, ChevronRight, Loader2, Hospital, AlertCircle, Clock, Stethoscope } from 'lucide-react'
+import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, XCircle, Trash2, CheckCircle, UserCheck, ChevronRight, Loader2, Hospital, AlertCircle, Clock, Stethoscope, Star, FileText, X, Eye } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 
@@ -68,6 +68,18 @@ export default function Consult() {
 
     const [isVideoEnabled, setIsVideoEnabled] = useState(true)
     const [prescriptionStatus, setPrescriptionStatus] = useState('pending')
+    const [toggleLoading, setToggleLoading] = useState(false)
+
+    // Rating state
+    const [showRating, setShowRating] = useState(false)
+    const [rating, setRating] = useState(0)
+    const [ratingHover, setRatingHover] = useState(0)
+    const [ratingSubmitted, setRatingSubmitted] = useState(false)
+
+    // Patient history modal (for doctor)
+    const [patientHistory, setPatientHistory] = useState(null)
+    const [showPatientHistory, setShowPatientHistory] = useState(false)
+    const [historyLoading, setHistoryLoading] = useState(false)
 
     // Refs
     const peerRef = useRef(null)
@@ -311,29 +323,69 @@ export default function Consult() {
             }
             checkExisting()
 
-            const sub = supabase.channel('doctors_status_sync')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-                    console.log('Realtime Profile Update:', payload)
+            const sub = supabase.channel('doctors_status_sync_' + session.user.id)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: 'role=in.(doctor_online,admin)' }, (payload) => {
+                    console.log('Doctor status changed:', payload)
                     checkDoctorsOnline()
                 })
                 .subscribe((status) => {
-                    console.log('Doctor Status Realtime Status:', status)
+                    console.log('Doctor Status Realtime:', status)
+                    // On successful subscription, do an immediate check
+                    if (status === 'SUBSCRIBED') {
+                        checkDoctorsOnline()
+                    }
                 })
 
-            // POLLING FALLBACK: Refresh doctors count every 15 seconds
+            // POLLING FALLBACK: Refresh doctors count every 5 seconds
             const interval = setInterval(() => {
                 checkDoctorsOnline()
-            }, 15000)
+            }, 5000)
+
+            // Also re-check when user focuses the tab/app
+            const handleVisibility = () => {
+                if (document.visibilityState === 'visible') {
+                    checkDoctorsOnline()
+                }
+            }
+            document.addEventListener('visibilitychange', handleVisibility)
 
             return () => {
                 supabase.removeChannel(sub)
                 clearInterval(interval)
+                document.removeEventListener('visibilitychange', handleVisibility)
             }
         }
 
         if (profile.role === 'doctor_online' || profile.role === 'admin') {
             setIsDoctorOnline(profile.is_online)
             fetchIncomingPatients()
+
+            // Auto-offline when doctor closes/leaves the page
+            const handleBeforeUnload = () => {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://sabckofvkyrbvlsvftof.supabase.co'
+                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhYmNrb2Z2a3lyYnZsc3ZmdG9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMDIwODEsImV4cCI6MjA4NTY3ODA4MX0.fMcfjg97XqEVnPVwFwKKgCtBvD8ZQ6xmTwgoh9bVb_g'
+                const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${session.user.id}`
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Prefer': 'return=minimal'
+                }
+                const body = JSON.stringify({ is_online: false })
+                // sendBeacon with fetch fallback
+                if (navigator.sendBeacon) {
+                    const blob = new Blob([body], { type: 'application/json' })
+                    // sendBeacon doesn't support custom headers, so use fetch with keepalive
+                    fetch(url, { method: 'PATCH', headers, body, keepalive: true }).catch(() => { })
+                } else {
+                    fetch(url, { method: 'PATCH', headers, body, keepalive: true }).catch(() => { })
+                }
+            }
+            window.addEventListener('beforeunload', handleBeforeUnload)
+
+            return () => {
+                window.removeEventListener('beforeunload', handleBeforeUnload)
+            }
         }
     }, [profile])
 
@@ -483,9 +535,60 @@ export default function Consult() {
     }
 
     const toggleOnlineStatus = async () => {
+        setToggleLoading(true)
         const nextStatus = !isDoctorOnline
-        await supabase.from('profiles').update({ is_online: nextStatus }).eq('id', session.user.id)
+        const { error } = await supabase.from('profiles').update({ is_online: nextStatus }).eq('id', session.user.id)
+        if (error) {
+            console.error('Failed to update online status:', error)
+            alert(language === 'en' ? 'Failed to update status: ' + error.message : 'อัปเดตสถานะไม่สำเร็จ: ' + error.message)
+            setToggleLoading(false)
+            return
+        }
+        console.log('Doctor online status updated to:', nextStatus)
         setIsDoctorOnline(nextStatus)
+        setToggleLoading(false)
+    }
+
+    // Fetch patient medical history (for doctor)
+    const fetchPatientHistory = async (patientId) => {
+        setHistoryLoading(true)
+        setShowPatientHistory(true)
+        try {
+            const { data: patientProfile } = await supabase.from('profiles')
+                .select('first_name, last_name, phone, province, district')
+                .eq('id', patientId).single()
+
+            const { data: consultations } = await supabase.from('consultations')
+                .select(`
+                    id, summary, status, created_at,
+                    doctor:profiles!doctor_id(first_name, last_name),
+                    prescriptions(medicines, total_cost, status)
+                `)
+                .eq('patient_id', patientId)
+                .eq('status', 'completed')
+                .order('created_at', { ascending: false })
+                .limit(10)
+
+            setPatientHistory({
+                profile: patientProfile,
+                consultations: consultations || []
+            })
+        } catch (err) {
+            console.error('Error fetching patient history:', err)
+        } finally {
+            setHistoryLoading(false)
+        }
+    }
+
+    // Submit rating
+    const submitRating = async () => {
+        if (!activeConsultation || rating === 0) return
+        try {
+            await supabase.from('consultations').update({ rating }).eq('id', activeConsultation.id)
+            setRatingSubmitted(true)
+        } catch (err) {
+            console.error('Rating error:', err)
+        }
     }
 
     const clearAllWaiting = async () => {
@@ -691,12 +794,13 @@ export default function Consult() {
                 top: 0,
                 left: 0,
                 width: '100vw',
-                height: '100vh', // Fallback
-                height: '100dvh', // Modern mobile browsers
+                height: '100vh',
+                height: '100dvh',
                 background: '#0f172a',
                 zIndex: 9999,
                 display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row'
+                flexDirection: isMobile ? 'column' : 'row',
+                overflow: 'hidden'
             }}>
                 {/* Main Content Area (Video) */}
                 <div style={{
@@ -762,53 +866,64 @@ export default function Consult() {
                     {isMobile && (
                         <div style={{
                             position: 'fixed',
-                            bottom: '2rem',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
                             display: 'flex',
-                            gap: '1.5rem',
+                            justifyContent: 'center',
+                            gap: '0.75rem',
                             zIndex: 100,
-                            padding: '12px 24px',
-                            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', // Safe Area Logic
-                            borderRadius: '50px',
-                            background: 'rgba(15, 23, 42, 0.7)',
-                            backdropFilter: 'blur(12px)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                            padding: '14px 16px',
+                            paddingBottom: 'calc(14px + env(safe-area-inset-bottom))',
+                            background: 'rgba(15, 23, 42, 0.85)',
+                            backdropFilter: 'blur(16px)',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                             alignItems: 'center'
                         }}>
-                            <button onClick={toggleAudio} className={`btn-circle ${isAudioEnabled ? '' : 'btn-danger'}`} style={{
-                                width: '50px', height: '50px', borderRadius: '50%',
+                            <button onClick={toggleAudio} style={{
+                                width: '48px', height: '48px', borderRadius: '50%',
                                 background: isAudioEnabled ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.9)',
                                 border: isAudioEnabled ? '1px solid rgba(59, 130, 246, 0.5)' : 'none',
-                                color: isAudioEnabled ? 'white' : 'white',
+                                color: 'white',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.2s ease'
+                                transition: 'all 0.2s ease', flexShrink: 0
                             }}>
-                                {isAudioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+                                {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                            </button>
+
+                            <button onClick={toggleVideo} style={{
+                                width: '48px', height: '48px', borderRadius: '50%',
+                                background: isVideoEnabled ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.9)',
+                                border: isVideoEnabled ? '1px solid rgba(59, 130, 246, 0.5)' : 'none',
+                                color: 'white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.2s ease', flexShrink: 0
+                            }}>
+                                {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
                             </button>
 
                             <button onClick={endCall} style={{
-                                width: '60px', height: '60px', borderRadius: '50%',
+                                width: '56px', height: '56px', borderRadius: '50%',
                                 background: '#ef4444',
-                                border: '4px solid rgba(239, 68, 68, 0.3)',
+                                border: '3px solid rgba(239, 68, 68, 0.3)',
                                 color: 'white',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
+                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+                                flexShrink: 0
                             }}>
-                                <PhoneOff size={28} fill="white" />
+                                <PhoneOff size={24} fill="white" />
                             </button>
 
-                            {isDoctor && !showMedicalPanel && (
-                                <button onClick={() => setShowMedicalPanel(true)} style={{
-                                    width: '50px', height: '50px', borderRadius: '50%',
-                                    background: 'white',
+                            {isDoctor && (
+                                <button onClick={() => setShowMedicalPanel(!showMedicalPanel)} style={{
+                                    width: '48px', height: '48px', borderRadius: '50%',
+                                    background: showMedicalPanel ? 'white' : 'rgba(255,255,255,0.15)',
                                     border: 'none',
-                                    color: 'var(--primary)',
+                                    color: showMedicalPanel ? 'var(--primary)' : 'white',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                                    flexShrink: 0
                                 }}>
-                                    <Stethoscope size={24} />
+                                    <Stethoscope size={20} />
                                 </button>
                             )}
                         </div>
@@ -886,61 +1001,172 @@ export default function Consult() {
                 {isDoctor && showMedicalPanel && (
                     <div className="animate-fade-in" style={{
                         width: isMobile ? '100%' : '400px',
-                        height: isMobile ? '65%' : '100%',
+                        height: isMobile ? 'auto' : '100%',
+                        maxHeight: isMobile ? '80dvh' : '100%',
                         background: 'white',
-                        padding: '1.5rem',
+                        padding: isMobile ? '1rem 1rem calc(1rem + 80px + env(safe-area-inset-bottom))' : '1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
                         overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
                         borderLeft: !isMobile ? '1px solid var(--border-color)' : 'none',
                         borderTop: isMobile ? '4px solid var(--primary)' : 'none',
-                        zIndex: 40,
+                        borderRadius: isMobile ? '1.5rem 1.5rem 0 0' : 0,
+                        zIndex: 50,
                         position: isMobile ? 'fixed' : 'relative',
                         bottom: isMobile ? 0 : 'auto',
                         left: isMobile ? 0 : 'auto',
-                        boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.1)' : 'none'
+                        boxShadow: isMobile ? '0 -8px 30px rgba(0,0,0,0.2)' : 'none'
                     }}>
-                        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>{t.consult.writeSummary}</h3>
+                        {/* Drag Handle for mobile */}
+                        {isMobile && (
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: '0.25rem 0 0.75rem' }}>
+                                <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: '#cbd5e1' }}></div>
+                            </div>
+                        )}
+                        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: '700', margin: 0 }}>{t.consult.writeSummary}</h3>
                             {isMobile && (
-                                <button onClick={() => setShowMedicalPanel(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <ChevronRight size={20} style={{ transform: 'rotate(90deg)', color: 'var(--text-muted)' }} />
+                                <button onClick={() => setShowMedicalPanel(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <ChevronRight size={22} style={{ transform: 'rotate(90deg)', color: 'var(--text-muted)' }} />
                                 </button>
                             )}
                         </div>
 
+                        {/* Patient History Button - during call */}
+                        {activeConsultation && (
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => fetchPatientHistory(activeConsultation.patient_id)}
+                                style={{
+                                    width: '100%', marginBottom: '1rem', borderRadius: '0.75rem',
+                                    minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                                    borderColor: 'var(--primary)', color: 'var(--primary)', fontSize: isMobile ? '0.95rem' : '0.9rem'
+                                }}
+                            >
+                                <FileText size={16} />
+                                {language === 'en' ? 'View Patient History' : 'ดูประวัติการรักษาผู้ป่วย'}
+                            </button>
+                        )}
+
                         <textarea
                             className="input"
-                            rows={4}
+                            rows={isMobile ? 3 : 4}
                             placeholder="Symptoms, Diagnosis, and Treatment Plan..."
                             value={summaryText}
                             onChange={e => setSummaryText(e.target.value)}
-                            style={{ margin: '0 0 1.5rem 0', borderRadius: '1rem', padding: '1rem' }}
+                            style={{ margin: '0 0 1rem 0', borderRadius: '0.75rem', padding: '0.85rem', fontSize: isMobile ? '1rem' : '0.95rem' }}
                         />
 
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '700', marginBottom: '1rem' }}>Prescribe Medications</h3>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
+                        <h3 style={{ fontSize: isMobile ? '1rem' : '1.125rem', fontWeight: '700', marginBottom: '0.75rem' }}>Prescribe Medications</h3>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
                             {medicines.map((m, i) => (
-                                <div key={i} className="glass-card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
-                                    <input className="input" placeholder="Medication Name" value={m.name} onChange={e => updateMed(i, 'name', e.target.value)} style={{ marginBottom: '0.5rem', fontSize: '0.9rem' }} />
+                                <div key={i} style={{ padding: isMobile ? '0.85rem' : '1rem', border: '1px solid var(--border-color)', borderRadius: '1rem', background: '#fafbfc' }}>
+                                    <input className="input" placeholder={language === 'en' ? 'Medication Name' : 'ชื่อยา'} value={m.name} onChange={e => updateMed(i, 'name', e.target.value)} style={{ marginBottom: '0.5rem', fontSize: isMobile ? '1rem' : '0.9rem', padding: isMobile ? '0.75rem' : '0.6rem 0.75rem', height: isMobile ? '48px' : 'auto' }} />
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                                        <input className="input" placeholder="Qty" value={m.quantity} onChange={e => updateMed(i, 'quantity', e.target.value)} style={{ fontSize: '0.9rem' }} />
-                                        <input className="input" type="number" placeholder="Price" value={m.price} onChange={e => updateMed(i, 'price', e.target.value)} style={{ fontSize: '0.9rem' }} />
+                                        <input className="input" placeholder={language === 'en' ? 'Qty' : 'จำนวน'} value={m.quantity} onChange={e => updateMed(i, 'quantity', e.target.value)} style={{ fontSize: isMobile ? '1rem' : '0.9rem', padding: isMobile ? '0.75rem' : '0.6rem 0.75rem', height: isMobile ? '48px' : 'auto' }} />
+                                        <input className="input" type="number" placeholder={language === 'en' ? 'Price' : 'ราคา'} value={m.price} onChange={e => updateMed(i, 'price', e.target.value)} style={{ fontSize: isMobile ? '1rem' : '0.9rem', padding: isMobile ? '0.75rem' : '0.6rem 0.75rem', height: isMobile ? '48px' : 'auto' }} />
                                     </div>
-                                    <button onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))} style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', background: 'none', padding: '0.5rem 0', cursor: 'pointer', marginTop: '0.25rem' }}>
-                                        <Trash2 size={12} style={{ marginRight: '4px' }} /> {language === 'en' ? 'Remove' : 'ลบ'}
+                                    <button onClick={() => setMedicines(medicines.filter((_, idx) => idx !== i))} style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', border: 'none', background: 'none', padding: '0.6rem 0', cursor: 'pointer', marginTop: '0.25rem', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                                        <Trash2 size={14} style={{ marginRight: '6px' }} /> {language === 'en' ? 'Remove' : 'ลบ'}
                                     </button>
                                 </div>
                             ))}
-                            <button className="btn btn-outline" style={{ width: '100%', borderRadius: '1rem' }} onClick={() => setMedicines([...medicines, { name: '', quantity: '', price: 0 }])}>
+                            <button className="btn btn-outline" style={{ width: '100%', borderRadius: '1rem', minHeight: '48px' }} onClick={() => setMedicines([...medicines, { name: '', quantity: '', price: 0 }])}>
                                 + {t.consult.addPrescription}
                             </button>
                         </div>
 
-                        <div style={{ marginTop: '1.5rem' }}>
-                            <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={submitPrescription}>
+                        <div style={{ marginTop: '1rem', paddingBottom: isMobile ? '0.5rem' : 0 }}>
+                            <button className="btn btn-primary" style={{ width: '100%', padding: isMobile ? '0.85rem' : '1rem', minHeight: '48px', fontSize: isMobile ? '1rem' : '0.95rem' }} onClick={submitPrescription}>
                                 {t.consult.saveRecord}
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Patient History Modal (overlay during call) */}
+                {showPatientHistory && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 10000, padding: '1rem'
+                    }} onClick={() => setShowPatientHistory(false)}>
+                        <div className="glass-card animate-fade-in" style={{
+                            width: '100%', maxWidth: '650px', maxHeight: '85vh', overflow: 'auto',
+                            padding: '2rem', background: 'white', borderRadius: '2rem',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                        }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <FileText size={20} color="var(--primary)" />
+                                    {language === 'en' ? 'Patient Medical History' : 'ประวัติการรักษาผู้ป่วย'}
+                                </h3>
+                                <button onClick={() => setShowPatientHistory(false)} style={{ background: 'var(--bg-color)', border: 'none', borderRadius: '0.75rem', padding: '0.5rem', cursor: 'pointer' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            {historyLoading ? (
+                                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                                    <Loader2 className="spinner" size={32} color="var(--primary)" />
+                                </div>
+                            ) : patientHistory ? (
+                                <>
+                                    <div style={{ background: 'var(--bg-color)', padding: '1.25rem', borderRadius: '1.25rem', marginBottom: '1.5rem' }}>
+                                        <div style={{ fontWeight: '700', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                                            {patientHistory.profile?.first_name} {patientHistory.profile?.last_name}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {patientHistory.profile?.phone && <span>📞 {patientHistory.profile.phone}</span>}
+                                            {patientHistory.profile?.province && <span>📍 {patientHistory.profile.district}, {patientHistory.profile.province}</span>}
+                                        </div>
+                                    </div>
+                                    {patientHistory.consultations.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                            <FileText size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                            <p>{language === 'en' ? 'No previous consultations found' : 'ไม่พบประวัติการรักษาก่อนหน้านี้'}</p>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {patientHistory.consultations.map((c, idx) => (
+                                                <div key={c.id} style={{
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '1.25rem', padding: '1.25rem',
+                                                    background: idx === 0 ? 'rgba(99, 102, 241, 0.03)' : 'white'
+                                                }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                                            {new Date(c.created_at).toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '700' }}>
+                                                            {language === 'en' ? 'Dr.' : 'พญ.'} {c.doctor?.first_name} {c.doctor?.last_name}
+                                                        </div>
+                                                    </div>
+                                                    {c.summary && (
+                                                        <div style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)', marginBottom: '0.75rem', borderLeft: '3px solid var(--primary)', paddingLeft: '0.75rem' }}>
+                                                            {c.summary}
+                                                        </div>
+                                                    )}
+                                                    {c.prescriptions && c.prescriptions.length > 0 && c.prescriptions[0].medicines && (
+                                                        <div style={{ background: 'var(--bg-color)', padding: '0.75rem 1rem', borderRadius: '0.75rem' }}>
+                                                            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                                                                {language === 'en' ? 'Prescribed Medications' : 'ยาที่สั่ง'}
+                                                            </div>
+                                                            {c.prescriptions[0].medicines.map((med, mi) => (
+                                                                <div key={mi} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '0.3rem 0', borderBottom: mi < c.prescriptions[0].medicines.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                                                    <span style={{ fontWeight: '600' }}>{med.name || '-'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>{med.quantity} • {med.price}฿</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 )}
@@ -970,9 +1196,9 @@ export default function Consult() {
         }
 
         return (
-            <div className="container section-spacing" style={{ maxWidth: '800px' }}>
-                <div className="glass-card animate-fade-in" style={{ padding: '3rem' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <div className="container section-spacing" style={{ maxWidth: '800px', padding: '0 1rem' }}>
+                <div className="glass-card animate-fade-in" style={{ padding: 'clamp(1.25rem, 5vw, 3rem)' }}>
+                    <div style={{ textAlign: 'center', marginBottom: 'clamp(1.5rem, 4vw, 3rem)' }}>
                         <h2 style={{ fontSize: '2.25rem', fontWeight: '800', marginBottom: '0.5rem' }}>{language === 'en' ? 'Consultation Report' : 'รายงานการตรวจรักษา'}</h2>
                         <p className="text-muted">{language === 'en' ? 'Review your medical summary and prescription' : 'ตรวจสอบผลการตรวจและรายการยาของคุณ'}</p>
                     </div>
@@ -1038,6 +1264,41 @@ export default function Consult() {
                             {language === 'en' ? 'Secure Checkout & Book Delivery' : 'ชำระเงินและเรียกพนักงานส่งยา'}
                         </button>
                     )}
+
+                    {/* Rating Section */}
+                    {!ratingSubmitted ? (
+                        <div style={{ marginTop: '2.5rem', padding: '2rem', background: 'var(--bg-color)', borderRadius: '1.5rem', textAlign: 'center' }}>
+                            <h4 style={{ fontWeight: '700', marginBottom: '0.75rem' }}>{language === 'en' ? 'Rate Your Doctor' : 'ให้คะแนนแพทย์'}</h4>
+                            <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>{language === 'en' ? 'Your feedback helps us improve our service' : 'ความคิดเห็นของคุณช่วยให้เราปรับปรุงบริการ'}</p>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                                {[1, 2, 3, 4, 5].map(star => (
+                                    <button
+                                        key={star}
+                                        onClick={() => setRating(star)}
+                                        onMouseEnter={() => setRatingHover(star)}
+                                        onMouseLeave={() => setRatingHover(0)}
+                                        style={{
+                                            background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem',
+                                            transform: (ratingHover || rating) >= star ? 'scale(1.2)' : 'scale(1)',
+                                            transition: 'transform 0.2s'
+                                        }}
+                                    >
+                                        <Star size={32} fill={(ratingHover || rating) >= star ? '#f59e0b' : 'none'} color={(ratingHover || rating) >= star ? '#f59e0b' : '#d1d5db'} />
+                                    </button>
+                                ))}
+                            </div>
+                            {rating > 0 && (
+                                <button className="btn btn-primary" onClick={submitRating} style={{ padding: '0.75rem 2rem' }}>
+                                    {language === 'en' ? 'Submit Rating' : 'ส่งคะแนน'}
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ marginTop: '2.5rem', padding: '1.5rem', background: '#fefce8', borderRadius: '1.5rem', textAlign: 'center', border: '1px solid #fde68a' }}>
+                            <Star size={24} fill="#f59e0b" color="#f59e0b" style={{ marginBottom: '0.5rem' }} />
+                            <p style={{ fontWeight: '700', color: '#92400e' }}>{language === 'en' ? 'Thank you for your feedback!' : 'ขอบคุณสำหรับคะแนน!'}</p>
+                        </div>
+                    )}
                 </div>
             </div>
         )
@@ -1047,25 +1308,29 @@ export default function Consult() {
     if (profile.role === 'doctor_online' || profile.role === 'admin') {
         return (
             <div className="container section-spacing">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-                    <div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: '800', margin: 0 }}>Telehealth Hub</h1>
-                        <p className="text-muted">Manage your virtual appointments</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+                    <div style={{ minWidth: 0 }}>
+                        <h1 style={{ fontSize: 'clamp(1.35rem, 4vw, 2rem)', fontWeight: '800', margin: 0 }}>Telehealth Hub</h1>
+                        <p className="text-muted" style={{ margin: 0, marginTop: '0.25rem' }}>Manage your virtual appointments</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                         <button
                             className={`btn ${isDoctorOnline ? 'btn-success' : 'btn-outline'}`}
                             onClick={toggleOnlineStatus}
+                            disabled={toggleLoading}
                             style={{
                                 background: isDoctorOnline ? '#10b981' : 'transparent',
                                 color: isDoctorOnline ? 'white' : '#10b981',
-                                borderColor: '#10b981'
+                                borderColor: '#10b981',
+                                whiteSpace: 'nowrap',
+                                fontSize: 'clamp(0.8rem, 2.5vw, 0.95rem)',
+                                opacity: toggleLoading ? 0.6 : 1
                             }}>
-                            {isDoctorOnline ? (language === 'en' ? '● You are Online' : '● ออนไลน์อยู่') : (language === 'en' ? '○ Go Online' : '○ ออนไลน์')}
+                            {toggleLoading ? <Loader2 className="spinner" size={16} /> : isDoctorOnline ? (language === 'en' ? '● Online' : '● ออนไลน์') : (language === 'en' ? '○ Go Online' : '○ ออนไลน์')}
                         </button>
                         {incomingPatients.length > 0 && (
-                            <button className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={clearAllWaiting}>
-                                <Trash2 size={18} /> Clear Room
+                            <button className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#ef4444', whiteSpace: 'nowrap', fontSize: 'clamp(0.8rem, 2.5vw, 0.95rem)' }} onClick={clearAllWaiting}>
+                                <Trash2 size={16} /> {language === 'en' ? 'Clear' : 'ล้าง'}
                             </button>
                         )}
                     </div>
@@ -1099,28 +1364,124 @@ export default function Consult() {
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
                                             flexWrap: 'wrap',
-                                            gap: '1.5rem',
-                                            padding: '1.5rem',
+                                            gap: '1rem',
+                                            padding: 'clamp(1rem, 3vw, 1.5rem)',
                                             background: idx === 0 ? 'var(--primary-light)' : 'white',
                                             border: idx === 0 ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                                            borderRadius: '1.5rem'
+                                            borderRadius: '1.25rem'
                                         }}>
-                                        <div>
-                                            <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>{p.profiles?.first_name} {p.profiles?.last_name}</div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div style={{ fontSize: 'clamp(0.95rem, 3vw, 1.1rem)', fontWeight: '700' }}>{p.profiles?.first_name} {p.profiles?.last_name}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                                                 <Clock size={12} />
-                                                {language === 'en' ? `Waiting for ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} mins` : `รอมาแล้ว ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} นาที`}
+                                                {language === 'en' ? `Waiting ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} min` : `รอ ${Math.floor((new Date() - new Date(p.created_at)) / 60000)} นาที`}
                                             </div>
                                         </div>
-                                        <button className="btn btn-primary" onClick={() => callPatient(p)}>
-                                            <Video size={18} /> {t.consult.startConsult}
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                            <button className="btn btn-outline" style={{ whiteSpace: 'nowrap', padding: '0.6rem 0.75rem', fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => fetchPatientHistory(p.patient_id)} title={language === 'en' ? 'View History' : 'ดูประวัติ'}>
+                                                <Eye size={14} /> {language === 'en' ? 'History' : 'ประวัติ'}
+                                            </button>
+                                            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap', padding: '0.6rem 1rem', fontSize: 'clamp(0.8rem, 2.5vw, 0.95rem)' }} onClick={() => callPatient(p)}>
+                                                <Video size={16} /> {t.consult.startConsult}
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
+
+                {/* Patient History Modal */}
+                {showPatientHistory && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(8px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 2000, padding: '1rem'
+                    }} onClick={() => setShowPatientHistory(false)}>
+                        <div className="glass-card animate-fade-in" style={{
+                            width: '100%', maxWidth: '650px', maxHeight: '85vh', overflow: 'auto',
+                            padding: '2rem', background: 'white', borderRadius: '2rem',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                        }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <FileText size={20} color="var(--primary)" />
+                                    {language === 'en' ? 'Patient Medical History' : 'ประวัติการรักษาผู้ป่วย'}
+                                </h3>
+                                <button onClick={() => setShowPatientHistory(false)} style={{ background: 'var(--bg-color)', border: 'none', borderRadius: '0.75rem', padding: '0.5rem', cursor: 'pointer' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            {historyLoading ? (
+                                <div style={{ textAlign: 'center', padding: '3rem' }}>
+                                    <Loader2 className="spinner" size={32} color="var(--primary)" />
+                                </div>
+                            ) : patientHistory ? (
+                                <>
+                                    {/* Patient Info */}
+                                    <div style={{ background: 'var(--bg-color)', padding: '1.25rem', borderRadius: '1.25rem', marginBottom: '1.5rem' }}>
+                                        <div style={{ fontWeight: '700', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                                            {patientHistory.profile?.first_name} {patientHistory.profile?.last_name}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                            {patientHistory.profile?.phone && <span>📞 {patientHistory.profile.phone}</span>}
+                                            {patientHistory.profile?.province && <span>📍 {patientHistory.profile.district}, {patientHistory.profile.province}</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Consultations List */}
+                                    {patientHistory.consultations.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                            <FileText size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                            <p>{language === 'en' ? 'No previous consultations found' : 'ไม่พบประวัติการรักษาก่อนหน้านี้'}</p>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {patientHistory.consultations.map((c, idx) => (
+                                                <div key={c.id} style={{
+                                                    border: '1px solid var(--border-color)',
+                                                    borderRadius: '1.25rem',
+                                                    padding: '1.25rem',
+                                                    background: idx === 0 ? 'rgba(99, 102, 241, 0.03)' : 'white'
+                                                }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                                            {new Date(c.created_at).toLocaleDateString(language === 'en' ? 'en-US' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '0.5rem', background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '700' }}>
+                                                            {language === 'en' ? 'Dr.' : 'พญ.'} {c.doctor?.first_name} {c.doctor?.last_name}
+                                                        </div>
+                                                    </div>
+                                                    {c.summary && (
+                                                        <div style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-main)', marginBottom: '0.75rem', borderLeft: '3px solid var(--primary)', paddingLeft: '0.75rem' }}>
+                                                            {c.summary}
+                                                        </div>
+                                                    )}
+                                                    {c.prescriptions && c.prescriptions.length > 0 && c.prescriptions[0].medicines && (
+                                                        <div style={{ background: 'var(--bg-color)', padding: '0.75rem 1rem', borderRadius: '0.75rem' }}>
+                                                            <div style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                                                                {language === 'en' ? 'Prescribed Medications' : 'ยาที่สั่ง'}
+                                                            </div>
+                                                            {c.prescriptions[0].medicines.map((med, mi) => (
+                                                                <div key={mi} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '0.3rem 0', borderBottom: mi < c.prescriptions[0].medicines.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                                                                    <span style={{ fontWeight: '600' }}>{med.name || '-'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>{med.quantity} • {med.price}฿</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
             </div>
         )
     }

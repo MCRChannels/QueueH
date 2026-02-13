@@ -77,8 +77,10 @@ export default function Home() {
             .on('postgres_changes', { event: '*', table: 'hospitals' }, (payload) => {
                 fetchHospitals()
             })
-            .on('postgres_changes', { event: '*', table: 'queues' }, (payload) => {
-                if (session) checkActiveBooking(session.user.id)
+            .on('postgres_changes', { event: '*', table: 'queues' }, async (payload) => {
+                // Use fresh session to avoid stale closure (session is null at init)
+                const { data: { session: freshSession } } = await supabase.auth.getSession()
+                if (freshSession) checkActiveBooking(freshSession.user.id)
                 fetchHospitals()
             })
             .subscribe()
@@ -550,7 +552,7 @@ export default function Home() {
                         </div>
 
                         <div style={{ display: 'flex', gap: '1.25rem' }}>
-                            <button className="btn-outline" style={{ flex: 1, padding: '1rem', borderRadius: '1.25rem', fontWeight: '700' }} onClick={() => setSelectedHospital(null)}>
+                            <button className="btn-outline" style={{ flex: 1, padding: '1rem', borderRadius: '1.25rem', fontWeight: '700' }} onClick={() => setSelectedHospitalIdForModal(null)}>
                                 {t.home.keepBooking}
                             </button>
                             <button className="btn btn-primary" style={{ flex: 1.5, padding: '1rem', borderRadius: '1.25rem', background: 'var(--primary)', height: '60px', fontSize: '1.1rem', fontWeight: '800', boxShadow: '0 10px 15px -3px rgba(59,130,246,0.3)' }} onClick={confirmBooking} disabled={bookingLoading}>

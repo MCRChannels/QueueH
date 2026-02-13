@@ -80,18 +80,33 @@ export default function Navbar({ session }) {
                     to="/"
                     style={{
                         fontSize: '1.5rem',
-                        fontWeight: '700',
-                        color: 'var(--primary)',
+                        fontWeight: '800',
+                        color: 'var(--text-main)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.6rem',
-                        letterSpacing: '-0.02em'
+                        gap: '0.75rem',
+                        letterSpacing: '-0.04em'
                     }}
                 >
-                    <div style={{ background: 'var(--primary)', color: 'white', padding: '0.4rem', borderRadius: '0.6rem', display: 'flex' }}>
-                        <Stethoscope size={24} />
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="12" fill="var(--primary)" />
+                            <path d="M20 10C16.134 10 13 13.134 13 17V21C13 22.1046 13.8954 23 15 23H17C18.1046 23 19 22.1046 19 21V19H21V21C21 22.1046 21.8954 23 23 23H25C26.1046 23 27 22.1046 27 21V17C27 13.134 23.866 10 20 10Z" fill="white" />
+                            <path d="M20 23V30C20 31.1046 19.1046 32 18 32C16.8954 32 16 31.1046 16 30" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+                            <circle cx="20" cy="16" r="2" fill="white" />
+                        </svg>
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            width: '12px',
+                            height: '12px',
+                            background: '#10b981',
+                            border: '2px solid white',
+                            borderRadius: '50%'
+                        }}></div>
                     </div>
-                    QueueH
+                    <span>Queue<span style={{ color: 'var(--primary)' }}>H</span></span>
                 </Link>
 
                 {/* Desktop Menu */}

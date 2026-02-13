@@ -7,6 +7,7 @@ import { translations } from '../lib/translations'
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users')
+    const [searchQuery, setSearchQuery] = useState('')
     const [users, setUsers] = useState([])
     const [hospitals, setHospitals] = useState([])
     const [loading, setLoading] = useState(true)
@@ -186,7 +187,7 @@ export default function AdminDashboard() {
                         <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>{language === 'en' ? 'System Users' : 'ผู้ใช้งานระบบ'} ({users.length})</h3>
                         <div style={{ position: 'relative', flex: '1 1 200px' }}>
                             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input className="input" placeholder={language === 'en' ? "Search accounts..." : "ค้นหาบัญชี..."} style={{ paddingLeft: '2.75rem', width: '100%', height: '42px', borderRadius: '0.75rem' }} />
+                            <input className="input" placeholder={language === 'en' ? "Search accounts..." : "ค้นหาบัญชี..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ paddingLeft: '2.75rem', width: '100%', height: '42px', borderRadius: '0.75rem' }} />
                         </div>
                     </div>
                     <div className="mobile-table-wrapper">
@@ -200,7 +201,11 @@ export default function AdminDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map((u, idx) => (
+                                {users.filter(u => {
+                                    if (!searchQuery.trim()) return true
+                                    const q = searchQuery.toLowerCase()
+                                    return (u.first_name || '').toLowerCase().includes(q) || (u.last_name || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+                                }).map((u, idx) => (
                                     <tr key={u.id} className="table-row-hover" style={{ borderBottom: '1px solid var(--bg-color)' }}>
                                         <td data-label={language === 'en' ? 'Identity' : 'ข้อมูล'} style={{ padding: '1.25rem 2rem' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -210,7 +215,7 @@ export default function AdminDashboard() {
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     fontWeight: '700', fontSize: '0.875rem'
                                                 }}>
-                                                    {u.first_name?.[0].toUpperCase() || 'U'}
+                                                    {(u.first_name && u.first_name.length > 0) ? u.first_name[0].toUpperCase() : 'U'}
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>{u.first_name || (language === 'en' ? 'Incognito' : 'ไม่ระบุชื่อ')} {u.last_name || ''}</div>
@@ -255,7 +260,7 @@ export default function AdminDashboard() {
                     {/* Facility Control Center */}
                     <div className="admin-hospitals-layout">
                         <div>
-                            <div className="glass-card" style={{ padding: '2rem', sticky: 'top' }}>
+                            <div className="glass-card" style={{ padding: '2rem', position: 'sticky', top: '6rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                     <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.5rem' }}><Plus size={20} /></div>
                                     <h3 style={{ fontSize: '1.125rem', fontWeight: '700', margin: 0 }}>{language === 'en' ? 'Register Facility' : 'เพิ่มสถานพยาบาล'}</h3>
@@ -285,7 +290,7 @@ export default function AdminDashboard() {
                                         <div>
                                             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.25rem' }}>{h.name}</h3>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '80px', height: '8px', borderRadius: '50%', background: h.is_open ? '#10b981' : '#ef4444' }}></div>
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: h.is_open ? '#10b981' : '#ef4444' }}></div>
                                                 <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                                                     {h.is_open ? (language === 'en' ? 'Online' : 'ออนไลน์') : (language === 'en' ? 'Offline' : 'ออฟไลน์')}
                                                 </span>

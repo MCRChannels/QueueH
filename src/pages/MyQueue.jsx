@@ -61,12 +61,21 @@ export default function MyQueue() {
     }
 
     const cancelBooking = async () => {
-        if (!confirm(language === 'en' ? 'Are you sure you want to cancel?' : 'คุณแน่ใจว่าต้องการยกเลิกการจองหรือไม่?')) return
+        if (!confirm(language === 'en' ? 'Are you sure you want to cancel? You will lose 10 credibility points.' : 'คุณแน่ใจว่าต้องการยกเลิกหรือไม่? คุณจะถูกหักคะแนนความน่าเชื่อถือ 10 คะแนน')) return
 
         try {
             await supabase.from('queues').update({ status: 'cancelled', cancel_reason: 'User Cancelled via MyQ' }).eq('id', activeQueue.id)
-            // Penalty logic could be added here similar to Home.jsx
-            alert(language === 'en' ? 'Booking Cancelled' : 'ยกเลิกการจองสำเร็จ')
+
+            // Deduct credibility score
+            if (session) {
+                const { data: profileData } = await supabase.from('profiles').select('credibility_score').eq('id', session.user.id).single()
+                if (profileData) {
+                    const newScore = Math.max(0, (profileData.credibility_score || 100) - 10)
+                    await supabase.from('profiles').update({ credibility_score: newScore }).eq('id', session.user.id)
+                }
+            }
+
+            alert(language === 'en' ? 'Booking Cancelled. -10 Credibility points deducted.' : 'ยกเลิกการจองสำเร็จ ถูกหักคะแนนความน่าเชื่อถือ 10 คะแนน')
             fetchMyQueue()
         } catch (err) {
             alert('Error: ' + err.message)
@@ -119,7 +128,7 @@ export default function MyQueue() {
 
                     <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem' }}>{hospital.name}</h2>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '2rem' }}>
-                        <MapPin size={16} /> 2nd Floor, Building A
+                        <MapPin size={16} /> {hospital.name}
                     </div>
 
                     {/* BIG QUEUE NUMBER */}
