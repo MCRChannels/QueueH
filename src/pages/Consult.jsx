@@ -68,6 +68,7 @@ export default function Consult() {
 
     const [isVideoEnabled, setIsVideoEnabled] = useState(true)
     const [prescriptionStatus, setPrescriptionStatus] = useState('pending')
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const [toggleLoading, setToggleLoading] = useState(false)
 
     // Rating state
@@ -514,24 +515,63 @@ export default function Consult() {
     // -- ACTIONS --
     const startConsultationRequest = async () => {
         if (!myPeerId) return alert('Connecting to server... please wait.')
+        if (isSubmitting) return // Prevent double-clicks
 
-        // Auto-Cleanup: Cancel any old requests first
-        await supabase.from('consultations')
-            .update({ status: 'cancelled' })
-            .eq('patient_id', session.user.id)
-            .eq('status', 'waiting')
+        setIsSubmitting(true)
+        try {
+            // Check if already have a waiting entry (prevent duplicates from race condition)
+            const { data: existingWaiting } = await supabase.from('consultations')
+                .select('id')
+                .eq('patient_id', session.user.id)
+                .eq('status', 'waiting')
+                .maybeSingle()
 
-        const { data, error } = await supabase.from('consultations').insert({
-            patient_id: session.user.id,
-            status: 'waiting',
-            peer_id: myPeerId
-        }).select().single()
+            if (existingWaiting) {
+                // Already in queue, just restore that session
+                setActiveConsultation(existingWaiting)
+                setCallStatus('waiting')
+                setIsSubmitting(false)
+                return
+            }
 
-        if (error) {
-            alert('Error: ' + error.message)
-        } else {
-            setActiveConsultation(data)
-            setCallStatus('waiting')
+            // Auto-Cleanup: Cancel any old requests first
+            await supabase.from('consultations')
+                .update({ status: 'cancelled' })
+                .eq('patient_id', session.user.id)
+                .eq('status', 'waiting')
+
+            const { data, error } = await supabase.from('consultations').insert({
+                patient_id: session.user.id,
+                status: 'waiting',
+                peer_id: myPeerId
+            }).select().single()
+
+            if (error) {
+                // If duplicate key error (unique constraint), try to find existing
+                if (error.code === '23505') {
+                    const { data: existing } = await supabase.from('consultations')
+                        .select('*')
+                        .eq('patient_id', session.user.id)
+                        .eq('status', 'waiting')
+                        .maybeSingle()
+                    if (existing) {
+                        setActiveConsultation(existing)
+                        setCallStatus('waiting')
+                    } else {
+                        alert('Error: ' + error.message)
+                    }
+                } else {
+                    alert('Error: ' + error.message)
+                }
+            } else {
+                setActiveConsultation(data)
+                setCallStatus('waiting')
+            }
+        } catch (err) {
+            console.error('Queue request error:', err)
+            alert(language === 'en' ? 'Failed to join queue. Please try again.' : 'ไม่สามารถจองคิวได้ กรุณาลองใหม่')
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -1559,9 +1599,8 @@ export default function Consult() {
                             <div className="badge badge-success" style={{ padding: '0.6rem 1rem', display: 'inline-flex', alignSelf: 'center', marginBottom: '0.5rem' }}>
                                 <UserCheck size={14} style={{ marginRight: '0.5rem' }} /> {doctorsOnlineCount} {language === 'en' ? 'Doctor(s) Available Now' : 'ท่าน พร้อมให้บริการ'}
                             </div>
-                            <button className="btn btn-primary" style={{ width: '100%', padding: '1.1rem' }} onClick={startConsultationRequest}>
-                                {t.consult.startConsult}
-                                <ChevronRight size={20} />
+                            <button className="btn btn-primary" style={{ width: '100%', padding: '1.1rem', opacity: isSubmitting ? 0.7 : 1 }} onClick={startConsultationRequest} disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="spinner" size={20} /> : <>{t.consult.startConsult} <ChevronRight size={20} /></>}
                             </button>
                         </div>
                     ) : (

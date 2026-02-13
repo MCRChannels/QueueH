@@ -157,13 +157,57 @@ export default function Home() {
     const confirmBooking = async () => {
         setBookingLoading(true)
         try {
-            // 1. Fetch fresh total_queues to avoid race conditions/stale state
-            const { data: freshHosp } = await supabase.from('hospitals').select('total_queues').eq('id', selectedHospital.id).single()
-
             const { user } = session
-            const nextQueue = (freshHosp?.total_queues || 0) + 1
 
-            // 2. Insert into queues
+            // GUARD 1: Re-check for active booking right before insert (prevent race condition)
+            const { data: alreadyBooked } = await supabase.from('queues')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('status', 'waiting')
+                .maybeSingle()
+
+            if (alreadyBooked) {
+                alert(language === 'en' ? 'You already have an active booking!' : 'คุณมีการจองที่ยังคงค้างอยู่แล้ว!')
+                setSelectedHospitalIdForModal(null)
+                checkActiveBooking(user.id)
+                setBookingLoading(false)
+                return
+            }
+
+            // ATOMIC INCREMENT: Use RPC to atomically increment total_queues and get the new value
+            // This prevents two users from getting the same queue number
+            let nextQueue
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('increment_queue', {
+                hosp_id: selectedHospital.id
+            })
+
+            if (rpcError) {
+                // Fallback if RPC doesn't exist: use fresh read + increment (less safe but functional)
+                console.warn('RPC increment_queue not found, using fallback:', rpcError.message)
+                const { data: freshHosp } = await supabase.from('hospitals')
+                    .select('total_queues')
+                    .eq('id', selectedHospital.id)
+                    .single()
+
+                // Extra safety: get MAX queue_number from queues table to avoid conflicts
+                const { data: maxQ } = await supabase.from('queues')
+                    .select('queue_number')
+                    .eq('hospital_id', selectedHospital.id)
+                    .order('queue_number', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+
+                nextQueue = Math.max((freshHosp?.total_queues || 0), (maxQ?.queue_number || 0)) + 1
+
+                // Update hospital total
+                await supabase.from('hospitals')
+                    .update({ total_queues: nextQueue })
+                    .eq('id', selectedHospital.id)
+            } else {
+                nextQueue = rpcResult
+            }
+
+            // INSERT the queue entry
             const { error: qError } = await supabase.from('queues').insert({
                 user_id: user.id,
                 hospital_id: selectedHospital.id,
@@ -171,28 +215,32 @@ export default function Home() {
                 status: 'waiting'
             })
 
-            if (qError) throw qError
-
-            // 3. Increment total_queues in hospitals table
-            const { error: hError } = await supabase.from('hospitals')
-                .update({ total_queues: nextQueue })
-                .eq('id', selectedHospital.id)
-
-            if (hError) throw hError
+            if (qError) {
+                // Handle duplicate - if someone beat us, re-fetch and show error
+                if (qError.code === '23505') {
+                    alert(language === 'en'
+                        ? 'Queue conflict detected. Please try again.'
+                        : 'เกิดข้อขัดแย้งในการจองคิว กรุณาลองใหม่อีกครั้ง')
+                    fetchHospitals()
+                    checkActiveBooking(user.id)
+                } else {
+                    throw qError
+                }
+                return
+            }
 
             const waitTime = calculateWaitTime(selectedHospital.avg_waiting_time, selectedHospital.total_queues)
-            alert(`Booking Confirmed!\nYour Queue: #${nextQueue}\nEstimated Wait: ${waitTime} mins`)
+            alert(language === 'en'
+                ? `Booking Confirmed!\nYour Queue: #${nextQueue}\nEstimated Wait: ${waitTime} mins`
+                : `จองคิวสำเร็จ!\nคิวของคุณ: #${nextQueue}\nเวลารอโดยประมาณ: ${waitTime} นาที`)
 
-            // 2. Optimistic Update (Optional, as realtime will catch it)
-
-            // 3. Reset UI
             setSelectedHospitalIdForModal(null)
             checkActiveBooking(user.id)
-            fetchHospitals() // Refresh local state
+            fetchHospitals()
             navigate('/my-queue')
         } catch (err) {
             console.error('Booking Error:', err)
-            alert('Error booking queue: ' + err.message)
+            alert(language === 'en' ? 'Error booking queue: ' + err.message : 'เกิดข้อผิดพลาดในการจองคิว: ' + err.message)
         } finally {
             setBookingLoading(false)
         }
