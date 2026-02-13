@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Users, Calendar, Hospital, AlertCircle, TrendingUp, ChevronRight, Loader2, User, UserCheck, XCircle } from 'lucide-react'
@@ -22,6 +22,7 @@ export default function Home() {
     const [otherReason, setOtherReason] = useState('')
     const [cancelling, setCancelling] = useState(false)
     const [currentTime, setCurrentTime] = useState(new Date())
+    const bookingLockRef = useRef(false) // Synchronous lock to prevent double-clicks
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -155,11 +156,16 @@ export default function Home() {
     }
 
     const confirmBooking = async () => {
+        // SYNCHRONOUS LOCK: useRef updates instantly on the same tick
+        // This prevents double-clicks even before React re-renders
+        if (bookingLockRef.current) return
+        bookingLockRef.current = true
         setBookingLoading(true)
+
         try {
             const { user } = session
 
-            // GUARD 1: Re-check for active booking right before insert (prevent race condition)
+            // GUARD: Re-check for active booking right before insert
             const { data: alreadyBooked } = await supabase.from('queues')
                 .select('id')
                 .eq('user_id', user.id)
@@ -170,36 +176,33 @@ export default function Home() {
                 alert(language === 'en' ? 'You already have an active booking!' : 'คุณมีการจองที่ยังคงค้างอยู่แล้ว!')
                 setSelectedHospitalIdForModal(null)
                 checkActiveBooking(user.id)
-                setBookingLoading(false)
                 return
             }
 
-            // ATOMIC INCREMENT: Use RPC to atomically increment total_queues and get the new value
-            // This prevents two users from getting the same queue number
+            // Get next queue number (atomic RPC preferred, fallback otherwise)
             let nextQueue
             const { data: rpcResult, error: rpcError } = await supabase.rpc('increment_queue', {
                 hosp_id: selectedHospital.id
             })
 
             if (rpcError) {
-                // Fallback if RPC doesn't exist: use fresh read + increment (less safe but functional)
-                console.warn('RPC increment_queue not found, using fallback:', rpcError.message)
+                console.warn('RPC increment_queue not available, using fallback:', rpcError.message)
                 const { data: freshHosp } = await supabase.from('hospitals')
                     .select('total_queues')
                     .eq('id', selectedHospital.id)
                     .single()
 
-                // Extra safety: get MAX queue_number from queues table to avoid conflicts
+                // Only count active (waiting) queues — cancelled ones should NOT affect the next number
                 const { data: maxQ } = await supabase.from('queues')
                     .select('queue_number')
                     .eq('hospital_id', selectedHospital.id)
+                    .eq('status', 'waiting')
                     .order('queue_number', { ascending: false })
                     .limit(1)
                     .maybeSingle()
 
-                nextQueue = Math.max((freshHosp?.total_queues || 0), (maxQ?.queue_number || 0)) + 1
+                nextQueue = (freshHosp?.total_queues || 0) + 1
 
-                // Update hospital total
                 await supabase.from('hospitals')
                     .update({ total_queues: nextQueue })
                     .eq('id', selectedHospital.id)
@@ -216,7 +219,6 @@ export default function Home() {
             })
 
             if (qError) {
-                // Handle duplicate - if someone beat us, re-fetch and show error
                 if (qError.code === '23505') {
                     alert(language === 'en'
                         ? 'Queue conflict detected. Please try again.'
@@ -227,6 +229,24 @@ export default function Home() {
                     throw qError
                 }
                 return
+            }
+
+            // SELF-HEALING: Check if we accidentally created duplicates
+            // (e.g. two tabs, two devices, network retry)
+            const { data: myWaiting } = await supabase.from('queues')
+                .select('id, created_at')
+                .eq('user_id', user.id)
+                .eq('status', 'waiting')
+                .order('created_at', { ascending: true })
+
+            if (myWaiting && myWaiting.length > 1) {
+                // Keep the FIRST one, cancel all extras
+                const keepId = myWaiting[0].id
+                const extraIds = myWaiting.filter(q => q.id !== keepId).map(q => q.id)
+                console.warn('Duplicate queues detected, cleaning up:', extraIds)
+                await supabase.from('queues')
+                    .update({ status: 'cancelled' })
+                    .in('id', extraIds)
             }
 
             const waitTime = calculateWaitTime(selectedHospital.avg_waiting_time, selectedHospital.total_queues)
@@ -243,6 +263,7 @@ export default function Home() {
             alert(language === 'en' ? 'Error booking queue: ' + err.message : 'เกิดข้อผิดพลาดในการจองคิว: ' + err.message)
         } finally {
             setBookingLoading(false)
+            bookingLockRef.current = false
         }
     }
 
