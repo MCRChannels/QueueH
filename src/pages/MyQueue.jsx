@@ -15,8 +15,7 @@ export default function MyQueue() {
 
     // Notification State
     const lastNotifiedAt = useRef(null) // Track which threshold was last notified
-    const [notiBanner, setNotiBanner] = useState(null) // In-app notification banner
-    const notiBannerTimer = useRef(null)
+
     const [notiPermission, setNotiPermission] = useState(
         typeof Notification !== 'undefined' ? Notification.permission : 'denied'
     )
@@ -80,14 +79,9 @@ export default function MyQueue() {
         }
     }, [])
 
-    // Show in-app notification banner
-    const showNotiBanner = useCallback((message, type = 'info') => {
-        if (notiBannerTimer.current) clearTimeout(notiBannerTimer.current)
-        setNotiBanner({ message, type })
-        notiBannerTimer.current = setTimeout(() => setNotiBanner(null), 6000)
-    }, [])
 
-    // Send notification — ONLY ONE: in-app banner if page visible, system push if hidden
+
+    // Send notification — System Push only if hidden + Sound/Vibrate always
     const sendQueueAlert = useCallback((title, body, type = 'normal') => {
         // 1. Play sound
         playChime(type)
@@ -109,10 +103,12 @@ export default function MyQueue() {
             setTimeout(() => setPulseAnimation(false), 3000)
         }
 
-        // 4. Show ONLY ONE notification — never both
-        if (document.visibilityState === 'hidden') {
-            // Page is in background → system push notification only
-            if ('Notification' in window && Notification.permission === 'granted') {
+        // 4. System Notification (only if allowed)
+        // Note: We prioritize push for background, but some users might want it in foreground too.
+        // For now, let's allow it if permission granted, as we removed the in-app banner.
+        if ('Notification' in window && Notification.permission === 'granted') {
+            // Optional: check document.visibilityState to avoid double-alerting if user is staring at screen
+            if (document.visibilityState === 'hidden') {
                 try {
                     new Notification(title, {
                         body: body,
@@ -125,11 +121,8 @@ export default function MyQueue() {
                     })
                 } catch (e) { console.warn('Push notification error:', e) }
             }
-        } else {
-            // Page is visible → in-app banner only
-            showNotiBanner(body, type)
         }
-    }, [playChime, showNotiBanner])
+    }, [playChime])
 
     // Request notification permission
     const requestNotiPermission = async () => {
@@ -312,57 +305,7 @@ export default function MyQueue() {
     return (
         <div className="container section-spacing" style={{ maxWidth: '600px' }}>
 
-            {/* ─── FLOATING NOTIFICATION BANNER ─── */}
-            {notiBanner && (
-                <div
-                    className="animate-fade-in"
-                    style={{
-                        position: 'fixed',
-                        top: '1rem',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 10000,
-                        width: 'calc(100% - 2rem)',
-                        maxWidth: '500px',
-                        padding: '1rem 1.25rem',
-                        borderRadius: '1.25rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        fontWeight: '700',
-                        fontSize: '0.95rem',
-                        backdropFilter: 'blur(16px)',
-                        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
-                        cursor: 'pointer',
-                        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        ...(notiBanner.type === 'critical' ? {
-                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95))',
-                            color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)'
-                        } : notiBanner.type === 'urgent' ? {
-                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(79, 70, 229, 0.95))',
-                            color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)'
-                        } : {
-                            background: 'rgba(255, 255, 255, 0.95)',
-                            color: 'var(--text-main)',
-                            border: '1px solid var(--border-color)'
-                        })
-                    }}
-                    onClick={() => setNotiBanner(null)}
-                >
-                    <div style={{
-                        width: '40px', height: '40px', borderRadius: '0.75rem',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: notiBanner.type === 'critical' || notiBanner.type === 'urgent'
-                            ? 'rgba(255,255,255,0.2)' : 'var(--primary-light)',
-                        flexShrink: 0
-                    }}>
-                        <BellRing size={20} color={notiBanner.type === 'critical' || notiBanner.type === 'urgent' ? 'white' : 'var(--primary)'} />
-                    </div>
-                    <div style={{ flex: 1, lineHeight: '1.4' }}>{notiBanner.message}</div>
-                </div>
-            )}
+
 
             {/* ─── NOTIFICATION PERMISSION CARD ─── */}
             {notiPermission !== 'granted' && 'Notification' in window && (
