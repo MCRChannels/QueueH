@@ -187,19 +187,11 @@ export default function Home() {
 
             if (rpcError) {
                 console.warn('RPC increment_queue not available, using fallback:', rpcError.message)
+                // Fetch fresh total_queues directly from DB (not stale local state)
                 const { data: freshHosp } = await supabase.from('hospitals')
                     .select('total_queues')
                     .eq('id', selectedHospital.id)
                     .single()
-
-                // Only count active (waiting) queues — cancelled ones should NOT affect the next number
-                const { data: maxQ } = await supabase.from('queues')
-                    .select('queue_number')
-                    .eq('hospital_id', selectedHospital.id)
-                    .eq('status', 'waiting')
-                    .order('queue_number', { ascending: false })
-                    .limit(1)
-                    .maybeSingle()
 
                 nextQueue = (freshHosp?.total_queues || 0) + 1
 

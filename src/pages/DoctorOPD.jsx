@@ -361,6 +361,32 @@ export default function DoctorOPD() {
                                 </>
                             )}
                         </button>
+
+                        {/* Visible Reset Queue Button */}
+                        {(queues.length > 0 || (hospital?.total_queues || 0) > 0) && (
+                            <button
+                                onClick={clearAllQueues}
+                                disabled={actionLoading}
+                                className="btn animate-fade-in"
+                                style={{
+                                    padding: '1rem',
+                                    width: '100%',
+                                    borderRadius: '1.25rem',
+                                    background: 'transparent',
+                                    color: '#ef4444',
+                                    border: '1.5px solid #ef4444',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    fontWeight: '700',
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer'
+                                }}>
+                                <Trash2 size={18} />
+                                {language === 'en' ? 'Reset All Queues' : 'รีเซ็ตคิวทั้งหมด'}
+                            </button>
+                        )}
                     </div>
 
                     {/* Right Column: List */}
