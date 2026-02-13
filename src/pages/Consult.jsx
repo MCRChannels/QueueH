@@ -96,18 +96,30 @@ export default function Consult() {
     // Notification State
     const lastNotifiedPosition = useRef(null)
 
+    // Save Feedback (non-blocking toast instead of alert)
+    const [saveFeedback, setSaveFeedback] = useState(null)
+    const saveFeedbackTimer = useRef(null)
+    const showSaveFeedback = (message) => {
+        if (saveFeedbackTimer.current) clearTimeout(saveFeedbackTimer.current)
+        setSaveFeedback(message)
+        saveFeedbackTimer.current = setTimeout(() => setSaveFeedback(null), 3000)
+    }
+
     // UI State
     const [showMedicalPanel, setShowMedicalPanel] = useState(window.innerWidth > 768)
 
-    // Stream Handling Effect
+    // Stream Handling Effect - only re-assign when remoteStream actually changes
     useEffect(() => {
         if (remoteVideoRef.current && remoteStream) {
-            remoteVideoRef.current.srcObject = remoteStream
+            // Guard: Only re-assign srcObject if it actually changed
+            if (remoteVideoRef.current.srcObject !== remoteStream) {
+                remoteVideoRef.current.srcObject = remoteStream
+            }
             remoteVideoRef.current.muted = false // IMPORTANT: Ensure not muted
             remoteVideoRef.current.volume = 1.0
             remoteVideoRef.current.play().catch(e => console.error('Error auto-playing video:', e))
         }
-    }, [remoteStream, callStatus])
+    }, [remoteStream])
 
     // -- INIT --
     useEffect(() => {
@@ -736,7 +748,8 @@ export default function Consult() {
         }
 
         await supabase.from('consultations').update({ summary: summaryText }).eq('id', activeConsultation.id)
-        alert(language === 'en' ? 'Prescription/Notes Saved!' : 'บันทึกรายการยาและบันทึกเรียบร้อยแล้ว!')
+        // Use non-blocking toast instead of alert() to prevent video freeze
+        showSaveFeedback(language === 'en' ? 'Prescription/Notes Saved!' : 'บันทึกรายการยาและบันทึกเรียบร้อยแล้ว!')
     }
 
     const confirmPayment = async () => {
@@ -802,6 +815,31 @@ export default function Consult() {
                 flexDirection: isMobile ? 'column' : 'row',
                 overflow: 'hidden'
             }}>
+                {/* Non-blocking Save Toast (replaces frozen alert) */}
+                {saveFeedback && (
+                    <div className="animate-fade-in" style={{
+                        position: 'fixed',
+                        top: '1.5rem',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10001,
+                        background: 'rgba(16, 185, 129, 0.95)',
+                        color: 'white',
+                        padding: '0.85rem 1.5rem',
+                        borderRadius: '1rem',
+                        boxShadow: '0 8px 32px rgba(16, 185, 129, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontWeight: '600',
+                        fontSize: '0.95rem',
+                        backdropFilter: 'blur(8px)',
+                        pointerEvents: 'none'
+                    }}>
+                        <CheckCircle size={20} />
+                        {saveFeedback}
+                    </div>
+                )}
                 {/* Main Content Area (Video) */}
                 <div style={{
                     flex: 1,
