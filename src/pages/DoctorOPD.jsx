@@ -195,10 +195,10 @@ export default function DoctorOPD() {
         if (!confirm(language === 'en' ? 'DEMO MODE: Clear all waiting patients and reset hospital counters?' : 'โหมดสาธิต: ล้างคิวผู้ป่วยที่รออยู่และรีเซ็ตเลขคิวทั้งหมด?')) return
         setActionLoading(true)
         try {
-            // 1. Cancel all waiting queues for this hospital
-            await supabase.from('queues').update({ status: 'cancelled' }).eq('hospital_id', hospital.id).eq('status', 'waiting')
+            // 1. DELETE ALL queues for this hospital (every status — clean slate)
+            await supabase.from('queues').delete().eq('hospital_id', hospital.id)
 
-            // 2. Reset hospital counters
+            // 2. Reset hospital counters to 0 so next booking gets #1
             await supabase.from('hospitals').update({ current_queue: 0, total_queues: 0 }).eq('id', hospital.id)
 
             await fetchHospitalData(hospital.id)

@@ -847,7 +847,7 @@ export default function Consult() {
                 top: 0,
                 left: 0,
                 width: '100vw',
-                height: '100vh',
+                minHeight: '100vh',
                 height: '100dvh',
                 background: '#0f172a',
                 zIndex: 9999,

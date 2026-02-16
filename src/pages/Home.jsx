@@ -179,28 +179,32 @@ export default function Home() {
                 return
             }
 
-            // Get next queue number (atomic RPC preferred, fallback otherwise)
+            // Get next queue number — count ACTUAL queue records (not stale counter)
             let nextQueue
-            const { data: rpcResult, error: rpcError } = await supabase.rpc('increment_queue', {
-                hosp_id: selectedHospital.id
-            })
 
-            if (rpcError) {
-                console.warn('RPC increment_queue not available, using fallback:', rpcError.message)
-                // Fetch fresh total_queues directly from DB (not stale local state)
-                const { data: freshHosp } = await supabase.from('hospitals')
-                    .select('total_queues')
-                    .eq('id', selectedHospital.id)
-                    .single()
+            // Count existing queues for this hospital today (any status except cancelled)
+            const { data: existingQueues, error: countError } = await supabase.from('queues')
+                .select('queue_number')
+                .eq('hospital_id', selectedHospital.id)
+                .in('status', ['waiting', 'completed', 'in_progress'])
+                .order('queue_number', { ascending: false })
+                .limit(1)
 
-                nextQueue = (freshHosp?.total_queues || 0) + 1
-
-                await supabase.from('hospitals')
-                    .update({ total_queues: nextQueue })
-                    .eq('id', selectedHospital.id)
+            if (countError) {
+                console.error('Error counting queues:', countError.message)
+                nextQueue = 1
+            } else if (existingQueues && existingQueues.length > 0) {
+                // Next number = highest existing + 1
+                nextQueue = existingQueues[0].queue_number + 1
             } else {
-                nextQueue = rpcResult
+                // No active queues exist → start fresh at 1
+                nextQueue = 1
             }
+
+            // Sync the hospital counter to match reality
+            await supabase.from('hospitals')
+                .update({ total_queues: nextQueue })
+                .eq('id', selectedHospital.id)
 
             // INSERT the queue entry
             const { error: qError } = await supabase.from('queues').insert({

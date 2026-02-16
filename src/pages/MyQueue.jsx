@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Link } from 'react-router-dom'
-import { Clock, MapPin, User, Calendar, Loader2, CheckCircle, AlertCircle, Trash2, ArrowRight, Bell, BellRing, Volume2 } from 'lucide-react'
+import { Clock, MapPin, User, Calendar, Loader2, CheckCircle, AlertCircle, Trash2, ArrowRight, Bell, BellRing, Volume2, ChevronRight } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext'
 import { translations } from '../lib/translations'
 

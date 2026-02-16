@@ -13,6 +13,7 @@ import MyQueue from './pages/MyQueue'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import NotificationManager from './components/NotificationManager'
+import ProtectedRoute from './components/ProtectedRoute'
 import { supabase } from './lib/supabase'
 
 function App() {
@@ -60,10 +61,26 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/my-queue" element={session ? <MyQueue /> : <Navigate to="/login" />} />
-                  <Route path="/consult" element={session ? <Consult /> : <Navigate to="/login" />} />
-                  <Route path="/delivery" element={session ? <Delivery /> : <Navigate to="/login" />} />
-                  <Route path="/admin" element={session ? <AdminDashboard /> : <Navigate to="/login" />} />
-                  <Route path="/opd" element={session ? <DoctorOPD /> : <Navigate to="/login" />} />
+                  <Route path="/consult" element={
+                    <ProtectedRoute session={session} allowedRoles={['patient', 'doctor_online', 'admin']}>
+                      <Consult />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/delivery" element={
+                    <ProtectedRoute session={session} allowedRoles={['pharmacist', 'admin']}>
+                      <Delivery />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <ProtectedRoute session={session} allowedRoles={['admin']}>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/opd" element={
+                    <ProtectedRoute session={session} allowedRoles={['doctor_opd', 'admin']}>
+                      <DoctorOPD />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/profile" element={session ? <Profile /> : <Navigate to="/login" />} />
                 </Routes>
               </div>
