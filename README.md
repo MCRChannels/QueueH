@@ -2,7 +2,7 @@
 
 ระบบจัดการคิวโรงพยาบาลผ่านเว็บแอปพลิเคชัน ผู้ป่วยสามารถจองคิวโรงพยาบาลที่ต้องการ ติดตามสถานะคิวแบบเรียลไทม์ และพบแพทย์ผ่านวิดีโอคอลได้โดยไม่ต้องติดตั้งโปรแกรมเพิ่มเติม
 
-โปรเจ็คนี้สร้างขึ้นเป็นส่วนหนึ่งของงานมหาวิทยาลัย โดยใช้ Vercel สำหรับ deploy และ Supabase สำหรับฐานข้อมูลและการยืนยันตัวตน
+โปรเจ็คนี้สร้างขึ้นเป็นส่วนหนึ่งของวิชา Project Management โดยใช้ Vercel สำหรับ deploy และ Supabase สำหรับฐานข้อมูลและการยืนยันตัวตนครับ
 
 ---
 
@@ -37,7 +37,6 @@
 - **PeerJS** สำหรับวิดีโอคอล peer-to-peer
 - **Lucide React** สำหรับไอคอน
 - **xlsx** สำหรับ export ข้อมูลเป็นไฟล์ spreadsheet
-- Deploy บน **Vercel**
 
 ---
 
@@ -48,55 +47,8 @@
 - Node.js เวอร์ชัน 18 ขึ้นไป
 - โปรเจ็ค Supabase ที่รัน SQL migration แล้ว (ดูขั้นตอนด้านล่าง)
 
-### ติดตั้ง
-
-```bash
-git clone https://github.com/MCRChannels/QueueH.git
-cd QueueH
-npm install
-```
-
-### ตั้งค่า Environment Variables
-
-สร้างไฟล์ `.env` ที่ root ของโปรเจ็ค แล้วใส่ค่าดังนี้:
-
-```
-VITE_SUPABASE_URL=url_ของ_supabase_project
-VITE_SUPABASE_ANON_KEY=anon_key_ของ_supabase
-```
-
-ค่าทั้งสองหาได้จากหน้า Supabase dashboard ที่ **Settings > API**
-
-### ตั้งค่าฐานข้อมูล
-
-ก่อนรันโปรแกรมครั้งแรก ต้องรัน SQL migration ที่มีอยู่ในโปรเจ็คก่อน:
-
-1. เปิด Supabase dashboard แล้วไปที่ **SQL Editor**
-2. คัดลอกเนื้อหาในไฟล์ `supabase_migration.sql` ทั้งหมดแล้ว execute
-
-ไฟล์นี้จะสร้างตารางที่จำเป็น (`profiles`, `hospitals`, `queues`, `consultations`, `prescriptions`) รวมถึง row-level security policies และ column ที่ขาดหายไป
-
-### รันในเครื่อง
-
-```bash
-npm run dev
-```
-
-เปิดเบราว์เซอร์แล้วไปที่ `http://localhost:5173`
-
-### Build สำหรับ production
-
-```bash
-npm run build
-```
-
----
-
-## การ Deploy
-
-โปรเจ็คนี้ตั้งค่าสำหรับ Vercel ไว้แล้ว ไฟล์ `vercel.json` ทำหน้าที่ redirect ทุก route กลับมาที่ `index.html` เพื่อให้ client-side routing ทำงานถูกต้องเมื่อผู้ใช้กด refresh หรือเข้า URL โดยตรง
-
-หากต้องการ deploy instance ของตัวเอง ให้เชื่อมต่อ repository กับ Vercel แล้วเพิ่ม environment variable สองตัวข้างต้นในหน้า project settings ของ Vercel
+## ลองใช้งานได้ที่นี่เลบครับ
+เข้าใช้งานได้ที่ [queue-h.vercel.app](https://queue-h.vercel.app) 
 
 ---
 
@@ -115,6 +67,5 @@ src/
 
 ## หมายเหตุ
 
-- ไฟล์ `.env` ห้าม commit ขึ้น version control เด็ดขาด ถูก ignore ไว้ใน `.gitignore` แล้ว
 - การอัปเดตคิวแบบเรียลไทม์ใช้ฟีเจอร์ Realtime ของ Supabase ผ่าน channel subscription
 - ฟีเจอร์วิดีโอคอลต้องการให้ผู้ใช้ทั้งสองฝั่งอนุญาตสิทธิ์กล้องและไมโครโฟนในเบราว์เซอร์ก่อน
